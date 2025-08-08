@@ -411,7 +411,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         tabButtons[tabName]?.classList.add('active');
-        if (views[tabName]) views[tabName]!.style.display = 'block';
+        const viewToShow = views[tabName];
+        if (viewToShow) {
+            // The dashboard needs flex display to center its content
+            viewToShow.style.display = tabName === 'dashboard' ? 'flex' : 'block';
+        }
 
         if (tabName === 'meetingNotes') {
             fetchAndRenderMeetingsData();

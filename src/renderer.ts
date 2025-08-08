@@ -4,6 +4,8 @@
 let currentPage = 1;
 let searchQuery = '';
 let filterTag = '';
+let meetingsData: { folders: Folder[], notes: MeetingNote[] } = { folders: [], notes: [] };
+let selectedFolderId: string | null = null;
 
 // --- SAFE ELEMENT GETTER ---
 function getElem<T extends HTMLElement = HTMLElement>(id: string): T | null {
@@ -28,6 +30,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const taskList = getElem('task-list');
     const tagsList = getElem('tags-list');
     const paginationContainer = getElem('pagination-container');
+
+    // Meeting Note Elements
+    const folderTreeContainer = getElem('folder-tree-container');
+    const newFolderBtn = getElem('new-folder-btn');
 
     // Inputs and buttons
     const taskSearchInput = getElem<HTMLInputElement>('task-search-input');
@@ -195,6 +201,45 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeModal = () => {
         if (modal) modal.style.display = 'none';
     };
+
+    // --- Meeting Notes Renders ---
+
+    const renderFolderTree = (parentId: string | null, level: number): HTMLUListElement => {
+        const ul = document.createElement('ul');
+        if (level === 0) ul.className = 'root-level';
+
+        const children = meetingsData.folders.filter(f => f.parentId === parentId);
+
+        children.forEach(folder => {
+            const li = document.createElement('li');
+            li.innerHTML = `
+                <div class="folder-item ${selectedFolderId === folder.id ? 'selected' : ''}" data-folder-id="${folder.id}">
+                    <span class="folder-name-wrapper">
+                        <span>📁</span>
+                        <span class="folder-name">${folder.name}</span>
+                    </span>
+                    <span class="folder-actions">
+                        <button class="btn-icon add-subfolder-btn" title="Add Subfolder">➕</button>
+                    </span>
+                </div>
+            `;
+            // Append children recursively
+            if (meetingsData.folders.some(f => f.parentId === folder.id)) {
+                li.appendChild(renderFolderTree(folder.id, level + 1));
+            }
+            ul.appendChild(li);
+        });
+        return ul;
+    };
+
+    const fetchAndRenderMeetingsData = async () => {
+        meetingsData = await window.api.getAllMeetingsData();
+        if (folderTreeContainer) {
+            folderTreeContainer.innerHTML = '';
+            folderTreeContainer.appendChild(renderFolderTree(null, 0));
+        }
+    };
+
 
     // --- EVENT HANDLERS ---
 
@@ -367,6 +412,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         tabButtons[tabName]?.classList.add('active');
         if (views[tabName]) views[tabName]!.style.display = 'block';
+
+        if (tabName === 'meetingNotes') {
+            fetchAndRenderMeetingsData();
+        }
     };
 
     Object.entries(tabButtons).forEach(([tabName, tabButton]) => {
@@ -374,6 +423,44 @@ document.addEventListener('DOMContentLoaded', () => {
             tabButton.addEventListener('click', () => activateTab(tabName as keyof typeof views));
         }
     });
+
+    // --- Meeting Notes Event Handlers ---
+    if (newFolderBtn) {
+        newFolderBtn.addEventListener('click', async () => {
+            const name = prompt('Enter new folder name:');
+            if (name) {
+                await window.api.createFolder({ name, parentId: null });
+                fetchAndRenderMeetingsData();
+            }
+        });
+    }
+
+    if (folderTreeContainer) {
+        folderTreeContainer.addEventListener('click', async (e) => {
+            const target = e.target as HTMLElement;
+            const folderItem = target.closest('.folder-item');
+            const folderId = folderItem?.dataset.folderId;
+
+            // Handle adding a subfolder
+            if (target.matches('.add-subfolder-btn')) {
+                e.stopPropagation(); // Prevent folder selection
+                const name = prompt('Enter new sub-folder name:');
+                if (name && folderId) {
+                    await window.api.createFolder({ name, parentId: folderId });
+                    fetchAndRenderMeetingsData();
+                }
+                return;
+            }
+
+            // Handle selecting a folder
+            if (folderId) {
+                selectedFolderId = folderId;
+                // Re-render the tree to show the new selection
+                fetchAndRenderMeetingsData();
+                // TODO: In Part C, this will also render the notes for this folder.
+            }
+        });
+    }
 
     // --- Dashboard Widget Logic ---
     const widgetTasks = getElem('widget-tasks');

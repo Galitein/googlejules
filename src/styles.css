@@ -406,6 +406,54 @@ body {
     background-color: var(--secondary-color);
 }
 
+/* --- Meeting Notes --- */
+.sidebar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+#folder-tree-container ul {
+    list-style: none;
+    padding-left: 20px;
+}
+
+#folder-tree-container ul.root-level {
+    padding-left: 0;
+}
+
+.folder-item {
+    padding: 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.folder-item:hover {
+    background-color: var(--secondary-color);
+}
+
+.folder-item.selected {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.folder-name-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.folder-actions {
+    display: none; /* Hidden by default, shown on hover */
+}
+
+.folder-item:hover .folder-actions {
+    display: block;
+}
+
 /* --- Dashboard --- */
 #dashboard-view {
     display: flex;

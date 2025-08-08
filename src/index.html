@@ -33,8 +33,22 @@
 
         <!-- Meeting Notes View -->
         <div id="meeting-notes-view" class="view" style="display: none;">
-            <h1>Meeting Notes</h1>
-            <p>This feature is under construction.</p>
+            <div class="container">
+                <div class="sidebar">
+                    <div class="sidebar-header">
+                        <h2>Folders</h2>
+                        <button id="new-folder-btn" class="btn-icon" title="New Root Folder">➕</button>
+                    </div>
+                    <div id="folder-tree-container">
+                        <!-- Folder tree will be dynamically inserted here -->
+                    </div>
+                </div>
+                <div class="main-content">
+                    <div id="notes-list-container">
+                        <h1>Select a folder to see notes</h1>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Tasks View -->

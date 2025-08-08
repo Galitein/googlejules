@@ -1,4 +1,12 @@
-import type { Task } from './main';
+// Define the Task type globally for the renderer process
+interface Task {
+  id: number;
+  title: string;
+  status: 'pending' | 'completed';
+  created_date: string;
+  finished_date: string | null;
+  tags: string[];
+}
 
 declare global {
   interface Window {

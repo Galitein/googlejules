@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 
 // Define the Task type
-export interface Task {
+interface Task {
   id: number;
   title: string;
   status: 'pending' | 'completed';
@@ -51,7 +51,7 @@ function createWindow() {
   });
 
   mainWindow.loadFile(path.join(__dirname, '../src/index.html'));
-  mainWindow.webContents.openDevTools(); // Uncomment for debugging
+  // mainWindow.webContents.openDevTools(); // Uncomment for debugging
 }
 
 app.whenReady().then(() => {

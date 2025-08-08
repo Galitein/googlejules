@@ -1,5 +1,4 @@
 /// <reference path="renderer.d.ts" />
-import type { Task } from './main';
 
 // --- STATE ---
 let currentPage = 1;

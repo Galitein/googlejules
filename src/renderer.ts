@@ -438,7 +438,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (folderTreeContainer) {
         folderTreeContainer.addEventListener('click', async (e) => {
             const target = e.target as HTMLElement;
-            const folderItem = target.closest('.folder-item');
+            const folderItem = target.closest<HTMLElement>('.folder-item');
             const folderId = folderItem?.dataset.folderId;
 
             // Handle adding a subfolder

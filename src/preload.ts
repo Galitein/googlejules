@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { Task } from './main';
+import type { Task, Folder, MeetingNote } from './main';
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
@@ -20,6 +20,17 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.invoke('update-task', taskId, updates),
 
   deleteTask: (taskId: number) => ipcRenderer.invoke('delete-task', taskId),
+
+  // Meeting Notes
+  getAllMeetingsData: () => ipcRenderer.invoke('get-all-meetings-data'),
+  createFolder: (folderData: { name: string; parentId: string | null }) =>
+    ipcRenderer.invoke('create-folder', folderData),
+  createNote: (noteData: { title: string; content: string; folderId: string }) =>
+    ipcRenderer.invoke('create-note', noteData),
+  updateNote: (noteId: string, updates: Partial<Omit<MeetingNote, 'id'>>) =>
+    ipcRenderer.invoke('update-note', { noteId, updates }),
+  deleteNote: (noteId: string) => ipcRenderer.invoke('delete-note', noteId),
+  deleteFolder: (folderId: string) => ipcRenderer.invoke('delete-folder', folderId),
 });
 
 // We also need to declare the 'api' on the window object

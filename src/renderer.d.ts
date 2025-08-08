@@ -13,6 +13,20 @@ declare global {
     tags: string[];
   }
 
+  interface Folder {
+    id: string;
+    name: string;
+    parentId: string | null;
+  }
+
+  interface MeetingNote {
+    id: string;
+    title: string;
+    content: string; // Will be HTML
+    folderId: string;
+    meeting_date_time: string;
+  }
+
   interface Window {
     api: {
       getTasks: (options: {
@@ -35,6 +49,14 @@ declare global {
         updates: Partial<Omit<Task, 'id'>>
       ) => Promise<Task>;
       deleteTask: (taskId: number) => Promise<{ success: true }>;
+
+      // Meeting Notes
+      getAllMeetingsData: () => Promise<{ folders: Folder[], notes: MeetingNote[] }>;
+      createFolder: (folderData: { name: string; parentId: string | null }) => Promise<Folder>;
+      createNote: (noteData: { title: string; content: string; folderId: string }) => Promise<MeetingNote>;
+      updateNote: (noteId: string, updates: Partial<Omit<MeetingNote, 'id'>>) => Promise<MeetingNote>;
+      deleteNote: (noteId: string) => Promise<{ success: true }>;
+      deleteFolder: (folderId: string) => Promise<{ success: true }>;
     };
   }
 }

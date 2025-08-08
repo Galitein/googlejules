@@ -12,9 +12,52 @@ export interface Task {
   tags: string[];
 }
 
+export interface Folder {
+  id: string;
+  name: string;
+  parentId: string | null;
+}
+
+export interface MeetingNote {
+  id: string;
+  title: string;
+  content: string; // Will be HTML
+  folderId: string;
+  meeting_date_time: string;
+}
+
 // --- Data Persistence ---
 const userDataPath = app.getPath('userData');
 const tasksFilePath = path.join(userDataPath, 'tasks.json');
+const meetingsFilePath = path.join(userDataPath, 'meetings.json');
+
+interface MeetingsData {
+  folders: Folder[];
+  notes: MeetingNote[];
+}
+
+function readMeetingsData(): MeetingsData {
+  try {
+    if (!fs.existsSync(meetingsFilePath)) {
+      const defaultData = { folders: [], notes: [] };
+      fs.writeFileSync(meetingsFilePath, JSON.stringify(defaultData));
+      return defaultData;
+    }
+    const data = fs.readFileSync(meetingsFilePath, 'utf-8');
+    return JSON.parse(data);
+  } catch (error) {
+    console.error('Error reading meetings data:', error);
+    return { folders: [], notes: [] };
+  }
+}
+
+function writeMeetingsData(data: MeetingsData): void {
+  try {
+    fs.writeFileSync(meetingsFilePath, JSON.stringify(data, null, 2));
+  } catch (error) {
+    console.error('Error writing meetings data:', error);
+  }
+}
 
 function readTasks(): Task[] {
   try {
@@ -163,5 +206,75 @@ ipcMain.handle('delete-task', (_, taskId: number) => {
   let tasks = readTasks();
   const updatedTasks = tasks.filter(t => t.id !== taskId);
   writeTasks(updatedTasks);
+  return { success: true };
+});
+
+// --- Meeting Notes IPC Handlers ---
+import * as crypto from 'crypto';
+
+ipcMain.handle('get-all-meetings-data', () => {
+  return readMeetingsData();
+});
+
+ipcMain.handle('create-folder', (_, { name, parentId }: { name: string, parentId: string | null }) => {
+  const data = readMeetingsData();
+  const newFolder: Folder = {
+    id: crypto.randomUUID(),
+    name,
+    parentId,
+  };
+  data.folders.push(newFolder);
+  writeMeetingsData(data);
+  return newFolder;
+});
+
+ipcMain.handle('create-note', (_, { title, content, folderId }: { title: string, content: string, folderId: string }) => {
+  const data = readMeetingsData();
+  const newNote: MeetingNote = {
+    id: crypto.randomUUID(),
+    title,
+    content,
+    folderId,
+    meeting_date_time: new Date().toISOString(),
+  };
+  data.notes.push(newNote);
+  writeMeetingsData(data);
+  return newNote;
+});
+
+ipcMain.handle('update-note', (_, { noteId, updates }: { noteId: string, updates: Partial<Omit<MeetingNote, 'id'>> }) => {
+  const data = readMeetingsData();
+  const noteIndex = data.notes.findIndex(n => n.id === noteId);
+  if (noteIndex === -1) throw new Error('Note not found');
+
+  data.notes[noteIndex] = { ...data.notes[noteIndex], ...updates };
+  writeMeetingsData(data);
+  return data.notes[noteIndex];
+});
+
+ipcMain.handle('delete-note', (_, noteId: string) => {
+  const data = readMeetingsData();
+  data.notes = data.notes.filter(n => n.id !== noteId);
+  writeMeetingsData(data);
+  return { success: true };
+});
+
+ipcMain.handle('delete-folder', (_, folderId: string) => {
+  const data = readMeetingsData();
+  let foldersToDelete = [folderId];
+  let i = 0;
+  while (i < foldersToDelete.length) {
+    const currentFolderId = foldersToDelete[i];
+    const children = data.folders.filter(f => f.parentId === currentFolderId);
+    foldersToDelete.push(...children.map(c => c.id));
+    i++;
+  }
+
+  // Delete all notes in the identified folders
+  data.notes = data.notes.filter(note => !foldersToDelete.includes(note.folderId));
+  // Delete all the identified folders
+  data.folders = data.folders.filter(folder => !foldersToDelete.includes(folder.id));
+
+  writeMeetingsData(data);
   return { success: true };
 });

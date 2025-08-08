@@ -3,27 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <title>Task Manager</title>
-    <link rel="icon" href="../assets/icon.png">
+    <link rel="icon" href="../assets/icon.svg">
     <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline';">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="top-bar">
         <div class="tabs">
-            <button id="dashboard-tab-btn" class="tab-btn">Dashboard</button>
-            <button id="tasks-tab-btn" class="tab-btn active">Tasks</button>
+            <button id="dashboard-tab-btn" class="tab-btn active">Dashboard</button>
+            <button id="tasks-tab-btn" class="tab-btn">Tasks</button>
+            <button id="meeting-notes-tab-btn" class="tab-btn">Meeting Notes</button>
         </div>
     </div>
 
     <div class="content-area">
         <!-- Dashboard View -->
-        <div id="dashboard-view" class="view" style="display: none;">
-            <h1>Dashboard</h1>
-            <p>This space is reserved for future dashboard widgets.</p>
+        <div id="dashboard-view" class="view">
+            <div class="dashboard-widgets">
+                <button class="dashboard-widget" id="widget-tasks">
+                    <span class="widget-icon">📝</span>
+                    <span class="widget-title">Tasks</span>
+                </button>
+                <button class="dashboard-widget" id="widget-meeting-notes">
+                    <span class="widget-icon">📅</span>
+                    <span class="widget-title">Meeting Notes</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Meeting Notes View -->
+        <div id="meeting-notes-view" class="view" style="display: none;">
+            <h1>Meeting Notes</h1>
+            <p>This feature is under construction.</p>
         </div>
 
         <!-- Tasks View -->
-        <div id="tasks-view" class="view">
+        <div id="tasks-view" class="view" style="display: none;">
             <div class="container">
                 <!-- Left Sidebar for Tags -->
                 <div class="sidebar">

@@ -13,10 +13,16 @@ function getElem<T extends HTMLElement = HTMLElement>(id: string): T | null {
 // --- DOM EVENT LISTENER ---
 document.addEventListener('DOMContentLoaded', () => {
     // Tab elements
-    const dashboardTabBtn = getElem('dashboard-tab-btn');
-    const tasksTabBtn = getElem('tasks-tab-btn');
-    const dashboardView = getElem('dashboard-view');
-    const tasksView = getElem('tasks-view');
+    const tabButtons = {
+        dashboard: getElem('dashboard-tab-btn'),
+        tasks: getElem('tasks-tab-btn'),
+        meetingNotes: getElem('meeting-notes-tab-btn'),
+    };
+    const views = {
+        dashboard: getElem('dashboard-view'),
+        tasks: getElem('tasks-view'),
+        meetingNotes: getElem('meeting-notes-view'),
+    };
 
     // Main elements
     const taskList = getElem('task-list');
@@ -57,10 +63,15 @@ document.addEventListener('DOMContentLoaded', () => {
         return `${day}-${month}-${year} ${hours}:${minutes}`;
     };
 
+    const capitalize = (s: string) => {
+        if (typeof s !== 'string' || s.length === 0) return '';
+        return s.charAt(0).toUpperCase() + s.slice(1);
+    };
+
     const createTagBadge = (tag: string) => {
         const badge = document.createElement('span');
         badge.className = 'tag-badge';
-        badge.textContent = tag;
+        badge.textContent = capitalize(tag);
 
         const deleteBtn = document.createElement('button');
         deleteBtn.className = 'tag-delete-btn';
@@ -92,7 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <p class="task-title">${task.title}</p>
                     <div class="task-meta">
                         <div class="task-tags">
-                            ${task.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}
+                            ${task.tags.map(tag => `<span class="tag">${capitalize(tag)}</span>`).join('')}
                         </div>
                         <div class="task-dates">
                             <span class="date-created">Created: ${formatDateTime(task.created_date)}</span>
@@ -115,7 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const li = document.createElement('li');
             const button = document.createElement('button');
             button.className = 'tag-btn';
-            button.textContent = tag;
+            button.textContent = capitalize(tag);
             button.dataset.tag = tag;
             if (tag === filterTag) {
                 button.classList.add('active');
@@ -348,20 +359,31 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- Tab Switching Logic ---
-    if (dashboardTabBtn && tasksTabBtn && dashboardView && tasksView) {
-        dashboardTabBtn.addEventListener('click', () => {
-            dashboardTabBtn.classList.add('active');
-            tasksTabBtn.classList.remove('active');
-            dashboardView.style.display = 'block';
-            tasksView.style.display = 'none';
+    const activateTab = (tabName: keyof typeof views) => {
+        Object.values(tabButtons).forEach(btn => btn?.classList.remove('active'));
+        Object.values(views).forEach(view => {
+            if (view) view.style.display = 'none';
         });
 
-        tasksTabBtn.addEventListener('click', () => {
-            tasksTabBtn.classList.add('active');
-            dashboardTabBtn.classList.remove('active');
-            tasksView.style.display = 'block';
-            dashboardView.style.display = 'none';
-        });
+        tabButtons[tabName]?.classList.add('active');
+        if (views[tabName]) views[tabName]!.style.display = 'block';
+    };
+
+    Object.entries(tabButtons).forEach(([tabName, tabButton]) => {
+        if (tabButton) {
+            tabButton.addEventListener('click', () => activateTab(tabName as keyof typeof views));
+        }
+    });
+
+    // --- Dashboard Widget Logic ---
+    const widgetTasks = getElem('widget-tasks');
+    const widgetMeetingNotes = getElem('widget-meeting-notes');
+
+    if (widgetTasks) {
+        widgetTasks.addEventListener('click', () => activateTab('tasks'));
+    }
+    if (widgetMeetingNotes) {
+        widgetMeetingNotes.addEventListener('click', () => activateTab('meetingNotes'));
     }
 
     // --- INITIAL LOAD ---

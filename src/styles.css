@@ -405,3 +405,46 @@ body {
 .tab-btn:hover {
     background-color: var(--secondary-color);
 }
+
+/* --- Dashboard --- */
+#dashboard-view {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #fff;
+}
+
+.dashboard-widgets {
+    display: flex;
+    gap: 40px;
+}
+
+.dashboard-widget {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 200px;
+    height: 200px;
+    background-color: var(--container-background);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+}
+
+.dashboard-widget:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border-color: var(--primary-color);
+}
+
+.widget-icon {
+    font-size: 4rem;
+}
+
+.widget-title {
+    font-size: 1.5rem;
+    margin-top: 15px;
+    color: var(--text-color);
+}

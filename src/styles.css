@@ -286,6 +286,10 @@ body {
     margin-top: 0;
 }
 
+#prompt-modal .modal-content {
+    max-width: 400px;
+}
+
 .form-group {
     margin-bottom: 20px;
 }

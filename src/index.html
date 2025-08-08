@@ -108,6 +108,22 @@
         </div>
     </div>
 
+    <!-- Custom Prompt Modal -->
+    <div id="prompt-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h2 id="prompt-title">Enter Name</h2>
+            <form id="prompt-form">
+                <div class="form-group">
+                    <input type="text" id="prompt-input" required>
+                </div>
+                <div class="form-actions">
+                    <button type="button" id="prompt-cancel-btn" class="btn-secondary">Cancel</button>
+                    <button type="submit" class="btn-primary">OK</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Renderer Script -->
     <script src="../dist/renderer.js"></script>
 </body>

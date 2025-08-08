@@ -51,6 +51,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const tagInputContainer = getElem('tag-input-container');
     const cancelBtn = getElem('cancel-btn');
 
+    // Prompt Modal Elements
+    const promptModal = getElem('prompt-modal');
+    const promptTitle = getElem('prompt-title');
+    const promptForm = getElem<HTMLFormElement>('prompt-form');
+    const promptInput = getElem<HTMLInputElement>('prompt-input');
+    const promptCancelBtn = getElem('prompt-cancel-btn');
+
+
     // Check for critical elements
     if (!taskList || !tagsList || !paginationContainer || !modal || !taskForm) {
         console.error('Critical UI elements are missing. Application cannot start.');
@@ -200,6 +208,40 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const closeModal = () => {
         if (modal) modal.style.display = 'none';
+    };
+
+    // --- Custom Prompt ---
+    const showPrompt = (title: string, defaultValue = ''): Promise<string | null> => {
+        return new Promise((resolve) => {
+            if (!promptModal || !promptTitle || !promptForm || !promptInput || !promptCancelBtn) {
+                return resolve(null); // Or reject? For now, resolve null.
+            }
+
+            promptTitle.textContent = title;
+            promptInput.value = defaultValue;
+            promptModal.style.display = 'flex';
+            promptInput.focus();
+
+            const submitListener = (e: Event) => {
+                e.preventDefault();
+                cleanup();
+                resolve(promptInput.value);
+            };
+
+            const cancelListener = () => {
+                cleanup();
+                resolve(null);
+            };
+
+            const cleanup = () => {
+                promptForm.removeEventListener('submit', submitListener);
+                promptCancelBtn.removeEventListener('click', cancelListener);
+                if (promptModal) promptModal.style.display = 'none';
+            };
+
+            promptForm.addEventListener('submit', submitListener);
+            promptCancelBtn.addEventListener('click', cancelListener);
+        });
     };
 
     // --- Meeting Notes Renders ---
@@ -431,7 +473,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Meeting Notes Event Handlers ---
     if (newFolderBtn) {
         newFolderBtn.addEventListener('click', async () => {
-            const name = prompt('Enter new folder name:');
+            const name = await showPrompt('Enter New Folder Name');
             if (name) {
                 await window.api.createFolder({ name, parentId: null });
                 fetchAndRenderMeetingsData();
@@ -448,7 +490,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Handle adding a subfolder
             if (target.matches('.add-subfolder-btn')) {
                 e.stopPropagation(); // Prevent folder selection
-                const name = prompt('Enter new sub-folder name:');
+                const name = await showPrompt('Enter New Sub-folder Name');
                 if (name && folderId) {
                     await window.api.createFolder({ name, parentId: folderId });
                     fetchAndRenderMeetingsData();

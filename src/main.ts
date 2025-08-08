@@ -95,7 +95,7 @@ function createWindow() {
   });
 
   mainWindow.loadFile(path.join(__dirname, '../src/index.html'));
-  // mainWindow.webContents.openDevTools(); // Uncomment for debugging
+  mainWindow.webContents.openDevTools(); // Uncomment for debugging
 }
 
 app.whenReady().then(() => {

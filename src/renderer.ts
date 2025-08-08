@@ -1,3 +1,4 @@
+/// <reference path="renderer.d.ts" />
 import type { Task } from './main';
 
 // --- STATE ---
@@ -21,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Modal elements
     const modal = document.getElementById('task-modal')!;
     const modalTitle = document.getElementById('modal-title')!;
-    const taskForm = document.getElementById('task-form')!;
+    const taskForm = document.getElementById('task-form') as HTMLFormElement;
     const taskIdInput = document.getElementById('task-id-input') as HTMLInputElement;
     const taskTitleInput = document.getElementById('task-title-input') as HTMLInputElement;
     const taskTagsInput = document.getElementById('task-tags-input') as HTMLInputElement;
@@ -111,13 +112,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- MODAL ---
 
-    const openModal = (mode: 'create' | 'edit', task?: Task) => {
+    const openModal = (mode: 'create' | 'edit', task?: Partial<Task>) => {
         modalTitle.textContent = mode === 'create' ? 'New Task' : 'Edit Task';
         taskForm.reset();
         if (mode === 'edit' && task) {
             taskIdInput.value = String(task.id);
-            taskTitleInput.value = task.title;
-            taskTagsInput.value = task.tags.join(', ');
+            taskTitleInput.value = task.title || '';
+            taskTagsInput.value = task.tags?.join(', ') || '';
         } else {
             taskIdInput.value = '';
         }
@@ -132,7 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Debounce for search
     const debounce = (func: Function, delay: number) => {
-        let timeout: number;
+        let timeout: ReturnType<typeof setTimeout>;
         return (...args: any[]) => {
             clearTimeout(timeout);
             timeout = setTimeout(() => func.apply(this, args), delay);
@@ -157,11 +158,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     newTaskBtn.addEventListener('click', () => openModal('create'));
     cancelBtn.addEventListener('click', closeModal);
-    modal.addEventListener('click', (e) => {
+    modal.addEventListener('click', (e: MouseEvent) => {
         if (e.target === modal) closeModal();
     });
 
-    taskForm.addEventListener('submit', async (e) => {
+    taskForm.addEventListener('submit', async (e: Event) => {
         e.preventDefault();
         const id = taskIdInput.value ? Number(taskIdInput.value) : null;
         const title = taskTitleInput.value;
@@ -180,10 +181,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    taskList.addEventListener('click', async (e) => {
+    taskList.addEventListener('click', async (e: MouseEvent) => {
         const target = e.target as HTMLElement;
-        const taskItem = target.closest('.task-item');
-        if (!taskItem) return;
+        const taskItem = target.closest<HTMLElement>('.task-item');
+        if (!taskItem || !taskItem.dataset.taskId) return;
 
         const id = Number(taskItem.dataset.taskId);
 
@@ -200,9 +201,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Handle edit
         if (target.matches('.edit-btn')) {
-            const { tasks } = await window.api.getTasks({page: 1, searchQuery: '', filterTag: ''});
-            const taskToEdit = tasks.find(t => t.id === id)
-            if(taskToEdit) openModal('edit', taskToEdit);
+            const titleEl = taskItem.querySelector('.task-title');
+            const tagsEl = taskItem.querySelectorAll('.tag');
+            if (titleEl) {
+                const title = titleEl.textContent || '';
+                const tags = Array.from(tagsEl).map(t => t.textContent || '').filter(Boolean);
+                openModal('edit', { id, title, tags });
+            }
         }
 
         // Handle delete
@@ -214,10 +219,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    tagsList.addEventListener('click', (e) => {
+    tagsList.addEventListener('click', (e: MouseEvent) => {
         const target = e.target as HTMLElement;
-        if (target.matches('.tag-btn')) {
-            filterTag = target.dataset.tag!;
+        if (target.matches('.tag-btn') && (target as HTMLButtonElement).dataset.tag) {
+            filterTag = (target as HTMLButtonElement).dataset.tag!;
             currentPage = 1;
             fetchAndRenderData();
         }
@@ -234,14 +239,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const button = btn as HTMLButtonElement;
             const isAllTasks = !filterTag && button.id === 'all-tasks-btn';
             const isMatchingTag = filterTag && button.dataset.tag === filterTag;
-            button.classList.toggle('active', isAllTasks || isMatchingTag);
+            button.classList.toggle('active', !!(isAllTasks || isMatchingTag));
         });
     };
 
-    paginationContainer.addEventListener('click', (e) => {
+    paginationContainer.addEventListener('click', (e: MouseEvent) => {
         const target = e.target as HTMLElement;
-        if (target.matches('.pagination-btn')) {
-            currentPage = Number(target.dataset.page);
+        if (target.matches('.pagination-btn') && (target as HTMLButtonElement).dataset.page) {
+            currentPage = Number((target as HTMLButtonElement).dataset.page);
             fetchAndRenderData();
         }
     });

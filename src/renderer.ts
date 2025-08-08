@@ -12,6 +12,12 @@ function getElem<T extends HTMLElement = HTMLElement>(id: string): T | null {
 
 // --- DOM EVENT LISTENER ---
 document.addEventListener('DOMContentLoaded', () => {
+    // Tab elements
+    const dashboardTabBtn = getElem('dashboard-tab-btn');
+    const tasksTabBtn = getElem('tasks-tab-btn');
+    const dashboardView = getElem('dashboard-view');
+    const tasksView = getElem('tasks-view');
+
     // Main elements
     const taskList = getElem('task-list');
     const tagsList = getElem('tags-list');
@@ -30,6 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const taskIdInput = getElem<HTMLInputElement>('task-id-input');
     const taskTitleInput = getElem<HTMLInputElement>('task-title-input');
     const taskTagsInput = getElem<HTMLInputElement>('task-tags-input');
+    const tagInputContainer = getElem('tag-input-container');
     const cancelBtn = getElem('cancel-btn');
 
     // Check for critical elements
@@ -37,6 +44,31 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error('Critical UI elements are missing. Application cannot start.');
         return;
     }
+
+    // --- HELPERS ---
+    const formatDateTime = (isoString: string | null) => {
+        if (!isoString) return '';
+        const date = new Date(isoString);
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0'); // Months are 0-based
+        const year = date.getFullYear();
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        return `${day}-${month}-${year} ${hours}:${minutes}`;
+    };
+
+    const createTagBadge = (tag: string) => {
+        const badge = document.createElement('span');
+        badge.className = 'tag-badge';
+        badge.textContent = tag;
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'tag-delete-btn';
+        deleteBtn.innerHTML = '&times;';
+        badge.appendChild(deleteBtn);
+
+        return badge;
+    };
 
     // --- RENDER FUNCTIONS ---
 
@@ -58,8 +90,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div class="task-details">
                     <p class="task-title">${task.title}</p>
-                    <div class="task-tags">
-                        ${task.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}
+                    <div class="task-meta">
+                        <div class="task-tags">
+                            ${task.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}
+                        </div>
+                        <div class="task-dates">
+                            <span class="date-created">Created: ${formatDateTime(task.created_date)}</span>
+                            ${task.status === 'completed' ? `<span class="date-finished">Finished: ${formatDateTime(task.finished_date)}</span>` : ''}
+                        </div>
                     </div>
                 </div>
                 <div class="task-actions">
@@ -123,13 +161,20 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- MODAL ---
 
     const openModal = (mode: 'create' | 'edit', task?: Partial<Task>) => {
-        if (!modal || !modalTitle || !taskForm || !taskIdInput || !taskTitleInput || !taskTagsInput) return;
+        if (!modal || !modalTitle || !taskForm || !taskIdInput || !taskTitleInput || !tagInputContainer) return;
         modalTitle.textContent = mode === 'create' ? 'New Task' : 'Edit Task';
         taskForm.reset();
+
+        // Clear existing tags
+        tagInputContainer.querySelectorAll('.tag-badge').forEach(badge => badge.remove());
+
         if (mode === 'edit' && task) {
             taskIdInput.value = String(task.id || '');
             taskTitleInput.value = task.title || '';
-            taskTagsInput.value = task.tags?.join(', ') || '';
+            task.tags?.forEach(tag => {
+                const badge = createTagBadge(tag);
+                tagInputContainer.insertBefore(badge, taskTagsInput);
+            });
         } else {
             taskIdInput.value = '';
         }
@@ -177,12 +222,40 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.target === modal) closeModal();
     });
 
+    // --- Tag Input Logic ---
+    if (tagInputContainer) {
+        tagInputContainer.addEventListener('click', (e) => {
+            const target = e.target as HTMLElement;
+            if (target.matches('.tag-delete-btn')) {
+                target.parentElement?.remove();
+            } else {
+                taskTagsInput?.focus();
+            }
+        });
+    }
+
+    if (taskTagsInput) {
+        taskTagsInput.addEventListener('keydown', (e) => {
+            if (e.key === ',' || e.key === ' ' || e.key === 'Enter') {
+                e.preventDefault();
+                const tagText = taskTagsInput.value.trim();
+                if (tagText) {
+                    const badge = createTagBadge(tagText);
+                    tagInputContainer?.insertBefore(badge, taskTagsInput);
+                    taskTagsInput.value = '';
+                }
+            }
+        });
+    }
+
     taskForm.addEventListener('submit', async (e: Event) => {
         e.preventDefault();
-        if (!taskTitleInput || !taskTagsInput || !taskIdInput) return;
+        if (!taskTitleInput || !tagInputContainer || !taskIdInput) return;
 
         const title = taskTitleInput.value;
-        const tags = taskTagsInput.value.split(',').map(t => t.trim()).filter(Boolean);
+        const tags = Array.from(tagInputContainer.querySelectorAll('.tag-badge'))
+            .map(badge => badge.textContent?.slice(0, -1).trim() || '') // slice to remove '×'
+            .filter(Boolean);
 
         // --- VALIDATION ---
         if (!title.trim()) {
@@ -274,6 +347,24 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // --- Tab Switching Logic ---
+    if (dashboardTabBtn && tasksTabBtn && dashboardView && tasksView) {
+        dashboardTabBtn.addEventListener('click', () => {
+            dashboardTabBtn.classList.add('active');
+            tasksTabBtn.classList.remove('active');
+            dashboardView.style.display = 'block';
+            tasksView.style.display = 'none';
+        });
+
+        tasksTabBtn.addEventListener('click', () => {
+            tasksTabBtn.classList.add('active');
+            dashboardTabBtn.classList.remove('active');
+            tasksView.style.display = 'block';
+            dashboardView.style.display = 'none';
+        });
+    }
+
     // --- INITIAL LOAD ---
+    // Load data for the default tab (Tasks)
     fetchAndRenderData();
 });

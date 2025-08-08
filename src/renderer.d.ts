@@ -1,14 +1,18 @@
-// Define the Task type globally for the renderer process
-interface Task {
-  id: number;
-  title: string;
-  status: 'pending' | 'completed';
-  created_date: string;
-  finished_date: string | null;
-  tags: string[];
-}
+// By using `export {}`, we treat this file as a module,
+// which is necessary for the `declare global` to work correctly.
+export {};
 
 declare global {
+  // Define the Task type globally for the renderer process
+  interface Task {
+    id: number;
+    title: string;
+    status: 'pending' | 'completed';
+    created_date: string;
+    finished_date: string | null;
+    tags: string[];
+  }
+
   interface Window {
     api: {
       getTasks: (options: {
@@ -34,7 +38,3 @@ declare global {
     };
   }
 }
-
-// By using `export {}`, we treat this file as a module,
-// which is necessary for the `declare global` to work correctly.
-export {};

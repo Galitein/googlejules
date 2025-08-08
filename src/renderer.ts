@@ -144,9 +144,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const debounce = (func: Function, delay: number) => {
         let timeout: ReturnType<typeof setTimeout>;
-        return (...args: any[]) => {
+        return function(this: any, ...args: any[]) {
+            const context = this;
             clearTimeout(timeout);
-            timeout = setTimeout(() => func.apply(this, args), delay);
+            timeout = setTimeout(() => func.apply(context, args), delay);
         };
     };
 

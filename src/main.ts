@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 
 // Define the Task type
-interface Task {
+export interface Task {
   id: number;
   title: string;
   status: 'pending' | 'completed';

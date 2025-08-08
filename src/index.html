@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Task Manager</title>
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline';">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Left Sidebar for Tags -->
+        <div class="sidebar">
+            <h2>Tags</h2>
+            <button id="all-tasks-btn" class="tag-btn active">All Tasks</button>
+            <input type="search" id="tag-search-input" placeholder="Search tags...">
+            <ul id="tags-list">
+                <!-- Tags will be dynamically inserted here -->
+            </ul>
+        </div>
+
+        <!-- Main Content for Tasks -->
+        <div class="main-content">
+            <div class="header">
+                <h1>Tasks</h1>
+                <div class="header-controls">
+                    <input type="search" id="task-search-input" placeholder="Search tasks by title or tag...">
+                    <button id="new-task-btn" class="btn-primary">New Task</button>
+                </div>
+            </div>
+            <div id="task-list">
+                <!-- Tasks will be dynamically inserted here -->
+            </div>
+            <div id="pagination-container">
+                <!-- Pagination controls will be dynamically inserted here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Task Edit/Create Modal (hidden by default) -->
+    <div id="task-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h2 id="modal-title">New Task</h2>
+            <form id="task-form">
+                <input type="hidden" id="task-id-input">
+                <div class="form-group">
+                    <label for="task-title-input">Title</label>
+                    <input type="text" id="task-title-input" required>
+                </div>
+                <div class="form-group">
+                    <label for="task-tags-input">Tags (comma-separated)</label>
+                    <input type="text" id="task-tags-input">
+                </div>
+                <div class="form-actions">
+                    <button type="button" id="cancel-btn" class="btn-secondary">Cancel</button>
+                    <button type="submit" class="btn-primary">Save Task</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Renderer Script -->
+    <script src="../dist/renderer.js"></script>
+</body>
+</html>

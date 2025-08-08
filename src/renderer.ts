@@ -6,27 +6,38 @@ let currentPage = 1;
 let searchQuery = '';
 let filterTag = '';
 
-// --- DOM ELEMENTS ---
+// --- SAFE ELEMENT GETTER ---
+function getElem<T extends HTMLElement = HTMLElement>(id: string): T | null {
+    return document.getElementById(id) as T | null;
+}
+
+// --- DOM EVENT LISTENER ---
 document.addEventListener('DOMContentLoaded', () => {
     // Main elements
-    const taskList = document.getElementById('task-list')!;
-    const tagsList = document.getElementById('tags-list')!;
-    const paginationContainer = document.getElementById('pagination-container')!;
+    const taskList = getElem('task-list');
+    const tagsList = getElem('tags-list');
+    const paginationContainer = getElem('pagination-container');
 
     // Inputs and buttons
-    const taskSearchInput = document.getElementById('task-search-input') as HTMLInputElement;
-    const tagSearchInput = document.getElementById('tag-search-input') as HTMLInputElement;
-    const newTaskBtn = document.getElementById('new-task-btn')!;
-    const allTasksBtn = document.getElementById('all-tasks-btn')!;
+    const taskSearchInput = getElem<HTMLInputElement>('task-search-input');
+    const tagSearchInput = getElem<HTMLInputElement>('tag-search-input');
+    const newTaskBtn = getElem('new-task-btn');
+    const allTasksBtn = getElem('all-tasks-btn');
 
     // Modal elements
-    const modal = document.getElementById('task-modal')!;
-    const modalTitle = document.getElementById('modal-title')!;
-    const taskForm = document.getElementById('task-form') as HTMLFormElement;
-    const taskIdInput = document.getElementById('task-id-input') as HTMLInputElement;
-    const taskTitleInput = document.getElementById('task-title-input') as HTMLInputElement;
-    const taskTagsInput = document.getElementById('task-tags-input') as HTMLInputElement;
-    const cancelBtn = document.getElementById('cancel-btn')!;
+    const modal = getElem('task-modal');
+    const modalTitle = getElem('modal-title');
+    const taskForm = getElem<HTMLFormElement>('task-form');
+    const taskIdInput = getElem<HTMLInputElement>('task-id-input');
+    const taskTitleInput = getElem<HTMLInputElement>('task-title-input');
+    const taskTagsInput = getElem<HTMLInputElement>('task-tags-input');
+    const cancelBtn = getElem('cancel-btn');
+
+    // Check for critical elements
+    if (!taskList || !tagsList || !paginationContainer || !modal || !taskForm) {
+        console.error('Critical UI elements are missing. Application cannot start.');
+        return;
+    }
 
     // --- RENDER FUNCTIONS ---
 
@@ -113,10 +124,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- MODAL ---
 
     const openModal = (mode: 'create' | 'edit', task?: Partial<Task>) => {
+        if (!modal || !modalTitle || !taskForm || !taskIdInput || !taskTitleInput || !taskTagsInput) return;
         modalTitle.textContent = mode === 'create' ? 'New Task' : 'Edit Task';
         taskForm.reset();
         if (mode === 'edit' && task) {
-            taskIdInput.value = String(task.id);
+            taskIdInput.value = String(task.id || '');
             taskTitleInput.value = task.title || '';
             taskTagsInput.value = task.tags?.join(', ') || '';
         } else {
@@ -126,12 +138,11 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const closeModal = () => {
-        modal.style.display = 'none';
+        if (modal) modal.style.display = 'none';
     };
 
     // --- EVENT HANDLERS ---
 
-    // Debounce for search
     const debounce = (func: Function, delay: number) => {
         let timeout: ReturnType<typeof setTimeout>;
         return (...args: any[]) => {
@@ -140,33 +151,50 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     };
 
-    taskSearchInput.addEventListener('input', debounce(() => {
-        searchQuery = taskSearchInput.value;
-        currentPage = 1;
-        fetchAndRenderData();
-    }, 300));
+    if (taskSearchInput) {
+        taskSearchInput.addEventListener('input', debounce(() => {
+            searchQuery = taskSearchInput.value;
+            currentPage = 1;
+            fetchAndRenderData();
+        }, 300));
+    }
 
-    tagSearchInput.addEventListener('input', () => {
-        const query = tagSearchInput.value.toLowerCase();
-        const tagButtons = tagsList.querySelectorAll('.tag-btn');
-        tagButtons.forEach(button => {
-            const li = button.parentElement!;
-            const tag = button.textContent?.toLowerCase() || '';
-            li.style.display = tag.includes(query) ? '' : 'none';
+    if (tagSearchInput) {
+        tagSearchInput.addEventListener('input', () => {
+            const query = tagSearchInput.value.toLowerCase();
+            const tagButtons = tagsList.querySelectorAll('.tag-btn');
+            tagButtons.forEach(button => {
+                const li = button.parentElement!;
+                const tag = button.textContent?.toLowerCase() || '';
+                li.style.display = tag.includes(query) ? '' : 'none';
+            });
         });
-    });
+    }
 
-    newTaskBtn.addEventListener('click', () => openModal('create'));
-    cancelBtn.addEventListener('click', closeModal);
-    modal.addEventListener('click', (e: MouseEvent) => {
+    if (newTaskBtn) newTaskBtn.addEventListener('click', () => openModal('create'));
+    if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+    if (modal) modal.addEventListener('click', (e: MouseEvent) => {
         if (e.target === modal) closeModal();
     });
 
     taskForm.addEventListener('submit', async (e: Event) => {
         e.preventDefault();
-        const id = taskIdInput.value ? Number(taskIdInput.value) : null;
+        if (!taskTitleInput || !taskTagsInput || !taskIdInput) return;
+
         const title = taskTitleInput.value;
         const tags = taskTagsInput.value.split(',').map(t => t.trim()).filter(Boolean);
+
+        // --- VALIDATION ---
+        if (!title.trim()) {
+            alert('Title is required.');
+            return;
+        }
+        if (tags.length === 0) {
+            alert('At least one tag is required.');
+            return;
+        }
+
+        const id = taskIdInput.value ? Number(taskIdInput.value) : null;
 
         try {
             if (id) {
@@ -188,18 +216,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const id = Number(taskItem.dataset.taskId);
 
-        // Handle status change
         if (target.matches('.task-checkbox')) {
             const isChecked = (target as HTMLInputElement).checked;
             await window.api.updateTask(id, { status: isChecked ? 'completed' : 'pending' });
-            // Optimistically update UI before refetching for speed
-            taskItem.classList.toggle('completed', isChecked);
-            taskItem.classList.toggle('pending', !isChecked);
-            // Refetch to re-sort and ensure consistency
             fetchAndRenderData();
         }
 
-        // Handle edit
         if (target.matches('.edit-btn')) {
             const titleEl = taskItem.querySelector('.task-title');
             const tagsEl = taskItem.querySelectorAll('.tag');
@@ -210,7 +232,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // Handle delete
         if (target.matches('.delete-btn')) {
             if (confirm('Are you sure you want to delete this task?')) {
                 await window.api.deleteTask(id);
@@ -228,11 +249,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    allTasksBtn.addEventListener('click', () => {
-        filterTag = '';
-        currentPage = 1;
-        fetchAndRenderData();
-    });
+    if (allTasksBtn) {
+        allTasksBtn.addEventListener('click', () => {
+            filterTag = '';
+            currentPage = 1;
+            fetchAndRenderData();
+        });
+    }
 
     const updateActiveTagButton = () => {
         document.querySelectorAll('.sidebar .tag-btn').forEach(btn => {

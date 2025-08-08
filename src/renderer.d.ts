@@ -53,6 +53,7 @@ declare global {
       // Meeting Notes
       getAllMeetingsData: () => Promise<{ folders: Folder[], notes: MeetingNote[] }>;
       createFolder: (folderData: { name: string; parentId: string | null }) => Promise<Folder>;
+      updateFolder: (folderId: string, name: string) => Promise<Folder>;
       createNote: (noteData: { title: string; content: string; folderId: string }) => Promise<MeetingNote>;
       updateNote: (noteId: string, updates: Partial<Omit<MeetingNote, 'id'>>) => Promise<MeetingNote>;
       deleteNote: (noteId: string) => Promise<{ success: true }>;

@@ -451,11 +451,11 @@ body {
 }
 
 .folder-actions {
-    display: none; /* Hidden by default, shown on hover */
+    visibility: hidden;
 }
 
 .folder-item:hover .folder-actions {
-    display: block;
+    visibility: visible;
 }
 
 /* --- Dashboard --- */

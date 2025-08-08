@@ -25,6 +25,8 @@ contextBridge.exposeInMainWorld('api', {
   getAllMeetingsData: () => ipcRenderer.invoke('get-all-meetings-data'),
   createFolder: (folderData: { name: string; parentId: string | null }) =>
     ipcRenderer.invoke('create-folder', folderData),
+  updateFolder: (folderId: string, name: string) =>
+    ipcRenderer.invoke('update-folder', { folderId, name }),
   createNote: (noteData: { title: string; content: string; folderId: string }) =>
     ipcRenderer.invoke('create-note', noteData),
   updateNote: (noteId: string, updates: Partial<Omit<MeetingNote, 'id'>>) =>

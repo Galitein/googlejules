@@ -34,6 +34,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Meeting Note Elements
     const folderTreeContainer = getElem('folder-tree-container');
     const newFolderBtn = getElem('new-folder-btn');
+    const notesListHeader = getElem('notes-list-header');
+    const notesListTitle = getElem('notes-list-title');
+    const notesListPlaceholder = getElem('notes-list-placeholder');
 
     // Inputs and buttons
     const taskSearchInput = getElem<HTMLInputElement>('task-search-input');
@@ -261,6 +264,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <span class="folder-name">${folder.name}</span>
                     </span>
                     <span class="folder-actions">
+                        <button class="btn-icon edit-folder-btn" title="Rename Folder">✏️</button>
                         <button class="btn-icon add-subfolder-btn" title="Add Subfolder">➕</button>
                     </span>
                 </div>
@@ -498,9 +502,31 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            // Handle editing a folder
+            if (target.matches('.edit-folder-btn')) {
+                e.stopPropagation(); // Prevent folder selection
+                const currentFolder = meetingsData.folders.find(f => f.id === folderId);
+                if (currentFolder) {
+                    const newName = await showPrompt('Enter New Folder Name', currentFolder.name);
+                    if (newName && newName !== currentFolder.name) {
+                        await window.api.updateFolder(currentFolder.id, newName);
+                        fetchAndRenderMeetingsData();
+                    }
+                }
+                return;
+            }
+
             // Handle selecting a folder
             if (folderId) {
                 selectedFolderId = folderId;
+                const selectedFolder = meetingsData.folders.find(f => f.id === folderId);
+
+                if (notesListHeader) notesListHeader.style.display = 'flex';
+                if (notesListPlaceholder) notesListPlaceholder.style.display = 'none';
+                if (notesListTitle && selectedFolder) {
+                    notesListTitle.textContent = `Notes in ${selectedFolder.name}`;
+                }
+
                 // Re-render the tree to show the new selection
                 fetchAndRenderMeetingsData();
                 // TODO: In Part C, this will also render the notes for this folder.

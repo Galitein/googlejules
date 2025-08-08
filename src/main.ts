@@ -228,6 +228,16 @@ ipcMain.handle('create-folder', (_, { name, parentId }: { name: string, parentId
   return newFolder;
 });
 
+ipcMain.handle('update-folder', (_, { folderId, name }: { folderId: string, name: string }) => {
+  const data = readMeetingsData();
+  const folderIndex = data.folders.findIndex(f => f.id === folderId);
+  if (folderIndex === -1) throw new Error('Folder not found');
+
+  data.folders[folderIndex].name = name;
+  writeMeetingsData(data);
+  return data.folders[folderIndex];
+});
+
 ipcMain.handle('create-note', (_, { title, content, folderId }: { title: string, content: string, folderId: string }) => {
   const data = readMeetingsData();
   const newNote: MeetingNote = {

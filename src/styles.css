@@ -1,4 +1,8 @@
 /* --- Global Styles & Variables --- */
+* {
+    box-sizing: border-box;
+}
+
 :root {
     --primary-color: #4a90e2;
     --primary-hover-color: #357abd;
@@ -504,6 +508,13 @@ body {
 
 .note-item:hover {
     background-color: var(--secondary-color);
+}
+
+.note-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 5px;
 }
 
 .note-item-title {

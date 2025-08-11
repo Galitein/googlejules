@@ -272,6 +272,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </span>
                     <span class="folder-actions">
                         <button class="btn-icon edit-folder-btn" title="Rename Folder">✏️</button>
+                        <button class="btn-icon delete-folder-btn" title="Delete Folder">🗑️</button>
                         <button class="btn-icon add-subfolder-btn" title="Add Subfolder">➕</button>
                     </span>
                 </div>
@@ -304,7 +305,10 @@ document.addEventListener('DOMContentLoaded', () => {
             noteEl.className = 'note-item';
             noteEl.dataset.noteId = note.id;
             noteEl.innerHTML = `
-                <div class="note-item-title">${note.title}</div>
+                <div class="note-item-header">
+                    <div class="note-item-title">${note.title}</div>
+                    <button class="btn-icon delete-note-btn" title="Delete Note">🗑️</button>
+                </div>
                 <div class="note-item-date">
                     <span>Created: ${formatDateTime(note.created_date)}</span>
                     <span>Modified: ${formatDateTime(note.modified_date)}</span>
@@ -587,15 +591,27 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (noteListView) {
-        noteListView.addEventListener('click', (e) => {
+        noteListView.addEventListener('click', async (e) => {
             const target = e.target as HTMLElement;
             const noteItem = target.closest<HTMLElement>('.note-item');
-            if (noteItem && noteItem.dataset.noteId) {
-                const noteId = noteItem.dataset.noteId;
-                const noteToEdit = meetingsData.notes.find(n => n.id === noteId);
-                if (noteToEdit) {
-                    showEditor(noteToEdit);
+            if (!noteItem || !noteItem.dataset.noteId) return;
+
+            const noteId = noteItem.dataset.noteId;
+
+            // Handle deleting a note
+            if (target.matches('.delete-note-btn')) {
+                e.stopPropagation();
+                if (confirm('Are you sure you want to delete this note?')) {
+                    await window.api.deleteNote(noteId);
+                    fetchAndRenderMeetingsData();
                 }
+                return;
+            }
+
+            // Handle editing a note (by clicking anywhere else on the item)
+            const noteToEdit = meetingsData.notes.find(n => n.id === noteId);
+            if (noteToEdit) {
+                showEditor(noteToEdit);
             }
         });
     }
@@ -633,6 +649,24 @@ document.addEventListener('DOMContentLoaded', () => {
                     const newName = await showPrompt('Enter New Folder Name', currentFolder.name);
                     if (newName && newName !== currentFolder.name) {
                         await window.api.updateFolder(currentFolder.id, newName);
+                        fetchAndRenderMeetingsData();
+                    }
+                }
+                return;
+            }
+
+            // Handle deleting a folder
+            if (target.matches('.delete-folder-btn')) {
+                e.stopPropagation();
+                if (confirm('Are you sure you want to delete this folder and all its contents?')) {
+                    if (folderId) {
+                        await window.api.deleteFolder(folderId);
+                        // If the deleted folder was the selected one, reset the view
+                        if (selectedFolderId === folderId) {
+                            selectedFolderId = null;
+                            if (notesListHeader) notesListHeader.style.display = 'none';
+                            if (notesListPlaceholder) notesListPlaceholder.style.display = 'block';
+                        }
                         fetchAndRenderMeetingsData();
                     }
                 }

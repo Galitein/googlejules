@@ -458,6 +458,32 @@ body {
     visibility: visible;
 }
 
+.note-item {
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    margin-bottom: 10px;
+    cursor: pointer;
+}
+
+.note-item:hover {
+    background-color: var(--secondary-color);
+}
+
+.note-item-title {
+    font-weight: bold;
+}
+
+.note-item-date {
+    font-size: 0.8rem;
+    color: var(--light-text-color);
+    margin-top: 5px;
+}
+
+#note-editor-container .ql-container {
+    height: calc(100vh - 300px); /* Adjust height as needed */
+}
+
 /* --- Dashboard --- */
 #dashboard-view {
     display: flex;

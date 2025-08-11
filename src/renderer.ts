@@ -312,8 +312,8 @@ document.addEventListener('DOMContentLoaded', () => {
             noteEl.innerHTML = `
                 <div class="note-item-title">${note.title}</div>
                 <div class="note-item-date">
-                    <div>Modified: ${formatDateTime(note.modified_date)}</div>
-                    <div>Created: ${formatDateTime(note.created_date)}</div>
+                    <span>Created: ${formatDateTime(note.created_date)}</span>
+                    <span>Modified: ${formatDateTime(note.modified_date)}</span>
                 </div>
             `;
             notesListContainer.appendChild(noteEl);

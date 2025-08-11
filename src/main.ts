@@ -255,7 +255,7 @@ ipcMain.handle('create-note', (_, { title, content, folderId }: { title: string,
   return newNote;
 });
 
-ipcMain.handle('update-note', (_, { noteId, updates }: { noteId: string, updates: Partial<Omit<MeetingNote, 'id'>> }) => {
+ipcMain.handle('update-note', (_, noteId: string, updates: Partial<Omit<MeetingNote, 'id'>>) => {
   const data = readMeetingsData();
   const noteIndex = data.notes.findIndex(n => n.id === noteId);
   if (noteIndex === -1) throw new Error('Note not found');

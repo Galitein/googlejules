@@ -30,7 +30,7 @@ contextBridge.exposeInMainWorld('api', {
   createNote: (noteData: { title: string; content: string; folderId: string }) =>
     ipcRenderer.invoke('create-note', noteData),
   updateNote: (noteId: string, updates: Partial<Omit<MeetingNote, 'id'>>) =>
-    ipcRenderer.invoke('update-note', { noteId, updates }),
+    ipcRenderer.invoke('update-note', noteId, updates),
   deleteNote: (noteId: string) => ipcRenderer.invoke('delete-note', noteId),
   deleteFolder: (folderId: string) => ipcRenderer.invoke('delete-folder', folderId),
 });

@@ -43,12 +43,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Note Editor Elements
     const noteEditorView = getElem('note-editor-view');
     const noteListView = getElem('note-list-view');
-    const noteEditorTitle = getElem('note-editor-title');
-    const noteForm = getElem<HTMLFormElement>('note-form');
     const noteIdInput = getElem<HTMLInputElement>('note-id-input');
     const noteTitleInput = getElem<HTMLInputElement>('note-title-input');
-    const noteCancelBtn = getElem('note-cancel-btn');
-
 
     // Inputs and buttons
     const taskSearchInput = getElem<HTMLInputElement>('task-search-input');
@@ -72,7 +68,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const promptForm = getElem<HTMLFormElement>('prompt-form');
     const promptInput = getElem<HTMLInputElement>('prompt-input');
     const promptCancelBtn = getElem('prompt-cancel-btn');
-
 
     // Check for critical elements
     if (!taskList || !tagsList || !paginationContainer || !modal || !taskForm) {
@@ -229,7 +224,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const showPrompt = (title: string, defaultValue = ''): Promise<string | null> => {
         return new Promise((resolve) => {
             if (!promptModal || !promptTitle || !promptForm || !promptInput || !promptCancelBtn) {
-                return resolve(null); // Or reject? For now, resolve null.
+                return resolve(null);
             }
 
             promptTitle.textContent = title;
@@ -281,7 +276,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     </span>
                 </div>
             `;
-            // Append children recursively
             if (meetingsData.folders.some(f => f.parentId === folder.id)) {
                 li.appendChild(renderFolderTree(folder.id, level + 1));
             }
@@ -323,21 +317,20 @@ document.addEventListener('DOMContentLoaded', () => {
     let quill: any = null;
 
     const showEditor = (note: MeetingNote | null) => {
-        if (!noteListView || !noteEditorView || !noteForm || !noteEditorTitle || !noteIdInput || !noteTitleInput) return;
+        if (!noteListView || !noteEditorView || !noteIdInput || !noteTitleInput) return;
         noteListView.style.display = 'none';
-        noteEditorView.style.display = 'block';
+        noteEditorView.style.display = 'flex'; // Use flex to fill height
 
         if (note) { // Editing existing note
-            noteEditorTitle.textContent = 'Edit Note';
             noteIdInput.value = note.id;
             noteTitleInput.value = note.title;
             quill.root.innerHTML = note.content;
         } else { // Creating new note
-            noteEditorTitle.textContent = 'New Note';
-            noteForm.reset();
-            noteIdInput.value = '';
+            noteTitleInput.value = '';
+            noteIdInput.value = ''; // Important: clear the ID for new notes
             quill.root.innerHTML = '';
         }
+        noteTitleInput.focus();
     };
 
     const showListView = () => {
@@ -352,10 +345,8 @@ document.addEventListener('DOMContentLoaded', () => {
             folderTreeContainer.innerHTML = '';
             folderTreeContainer.appendChild(renderFolderTree(null, 0));
         }
-        // Also render the notes for the currently selected folder
         renderNotesList();
     };
-
 
     // --- EVENT HANDLERS ---
 
@@ -429,7 +420,6 @@ document.addEventListener('DOMContentLoaded', () => {
             .map(badge => badge.textContent?.slice(0, -1).trim() || '') // slice to remove '×'
             .filter(Boolean);
 
-        // --- VALIDATION ---
         if (!title.trim()) {
             alert('Title is required.');
             return;
@@ -529,12 +519,12 @@ document.addEventListener('DOMContentLoaded', () => {
         tabButtons[tabName]?.classList.add('active');
         const viewToShow = views[tabName];
         if (viewToShow) {
-            // The dashboard needs flex display to center its content
             viewToShow.style.display = tabName === 'dashboard' ? 'flex' : 'block';
         }
 
         if (tabName === 'meetingNotes') {
             fetchAndRenderMeetingsData();
+            showListView(); // Always show the list view when tab is activated
         }
     };
 
@@ -546,26 +536,53 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Meeting Notes Event Handlers ---
 
+    const handleAutoSave = debounce(async () => {
+        if (!noteIdInput || !noteTitleInput) return;
+        const id = noteIdInput.value;
+        const title = noteTitleInput.value || 'Untitled Note';
+        const content = quill.root.innerHTML;
+
+        if (id) { // Note exists, update it
+            await window.api.updateNote(id, { title, content });
+        } else { // New note, create it
+            if (selectedFolderId) {
+                const newNote = await window.api.createNote({ title, content, folderId: selectedFolderId });
+                noteIdInput.value = newNote.id; // CRITICAL: store the new ID for subsequent saves
+            } else {
+                // This case should ideally not happen if the UI is correct
+                return;
+            }
+        }
+        // We re-render the list in the background so it's updated when the user navigates back
+        fetchAndRenderMeetingsData();
+    }, 500);
+
     // Initialize Quill Editor
     if (getElem('note-editor-container')) {
         quill = new (window as any).Quill('#note-editor-container', {
             theme: 'snow',
+            placeholder: 'Description...',
             modules: {
                 toolbar: [
                     [{ 'header': [1, 2, 3, false] }],
                     ['bold', 'italic', 'underline', 'strike'],
                     [{ 'color': [] }, { 'background': [] }],
                     [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-                    ['link', 'image'],
+                    ['link'],
                     ['clean']
                 ]
             }
         });
+        quill.on('text-change', handleAutoSave);
+    }
+
+    if(noteTitleInput) {
+        noteTitleInput.addEventListener('keyup', handleAutoSave);
     }
 
     if (newNoteBtn) {
         newNoteBtn.addEventListener('click', () => {
-            showEditor(null); // Show editor for a new note
+            showEditor(null);
         });
     }
 
@@ -580,39 +597,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     showEditor(noteToEdit);
                 }
             }
-        });
-    }
-
-    if (noteForm) {
-        noteForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const id = noteIdInput?.value || null;
-            const title = noteTitleInput?.value || '';
-            const content = quill.root.innerHTML;
-
-            if (!title.trim()) {
-                alert('Title is required.');
-                return;
-            }
-
-            if (id) { // Update existing note
-                await window.api.updateNote(id, { title, content });
-            } else { // Create new note
-                if (selectedFolderId) {
-                    await window.api.createNote({ title, content, folderId: selectedFolderId });
-                } else {
-                    alert('Please select a folder first.');
-                    return;
-                }
-            }
-            await fetchAndRenderMeetingsData();
-            showListView();
-        });
-    }
-
-    if (noteCancelBtn) {
-        noteCancelBtn.addEventListener('click', () => {
-            showListView();
         });
     }
 
@@ -632,9 +616,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const folderItem = target.closest<HTMLElement>('.folder-item');
             const folderId = folderItem?.dataset.folderId;
 
-            // Handle adding a subfolder
             if (target.matches('.add-subfolder-btn')) {
-                e.stopPropagation(); // Prevent folder selection
+                e.stopPropagation();
                 const name = await showPrompt('Enter New Sub-folder Name');
                 if (name && folderId) {
                     await window.api.createFolder({ name, parentId: folderId });
@@ -643,9 +626,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // Handle editing a folder
             if (target.matches('.edit-folder-btn')) {
-                e.stopPropagation(); // Prevent folder selection
+                e.stopPropagation();
                 const currentFolder = meetingsData.folders.find(f => f.id === folderId);
                 if (currentFolder) {
                     const newName = await showPrompt('Enter New Folder Name', currentFolder.name);
@@ -657,7 +639,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // Handle selecting a folder
             if (folderId) {
                 selectedFolderId = folderId;
                 const selectedFolder = meetingsData.folders.find(f => f.id === folderId);
@@ -668,9 +649,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     notesListTitle.textContent = `Notes in ${selectedFolder.name}`;
                 }
 
-                // Re-render the tree to show the new selection
+                showListView();
                 fetchAndRenderMeetingsData();
-                // TODO: In Part C, this will also render the notes for this folder.
             }
         });
     }
@@ -687,6 +667,5 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- INITIAL LOAD ---
-    // Load data for the default tab (Tasks)
     fetchAndRenderData();
 });

@@ -24,7 +24,8 @@ declare global {
     title: string;
     content: string; // Will be HTML
     folderId: string;
-    meeting_date_time: string;
+    created_date: string;
+    modified_date: string;
   }
 
   interface Window {

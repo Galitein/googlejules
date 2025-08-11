@@ -23,7 +23,8 @@ export interface MeetingNote {
   title: string;
   content: string; // Will be HTML
   folderId: string;
-  meeting_date_time: string;
+  created_date: string;
+  modified_date: string;
 }
 
 // --- Data Persistence ---
@@ -240,12 +241,14 @@ ipcMain.handle('update-folder', (_, { folderId, name }: { folderId: string, name
 
 ipcMain.handle('create-note', (_, { title, content, folderId }: { title: string, content: string, folderId: string }) => {
   const data = readMeetingsData();
+  const now = new Date().toISOString();
   const newNote: MeetingNote = {
     id: crypto.randomUUID(),
     title,
     content,
     folderId,
-    meeting_date_time: new Date().toISOString(),
+    created_date: now,
+    modified_date: now,
   };
   data.notes.push(newNote);
   writeMeetingsData(data);
@@ -257,9 +260,14 @@ ipcMain.handle('update-note', (_, { noteId, updates }: { noteId: string, updates
   const noteIndex = data.notes.findIndex(n => n.id === noteId);
   if (noteIndex === -1) throw new Error('Note not found');
 
-  data.notes[noteIndex] = { ...data.notes[noteIndex], ...updates };
+  const updatedNote = {
+    ...data.notes[noteIndex],
+    ...updates,
+    modified_date: new Date().toISOString(),
+  };
+  data.notes[noteIndex] = updatedNote;
   writeMeetingsData(data);
-  return data.notes[noteIndex];
+  return updatedNote;
 });
 
 ipcMain.handle('delete-note', (_, noteId: string) => {

@@ -478,6 +478,7 @@ body {
     font-size: 0.8rem;
     color: var(--light-text-color);
     margin-top: 5px;
+    line-height: 1.4;
 }
 
 #note-editor-container .ql-container {

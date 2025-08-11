@@ -311,7 +311,10 @@ document.addEventListener('DOMContentLoaded', () => {
             noteEl.dataset.noteId = note.id;
             noteEl.innerHTML = `
                 <div class="note-item-title">${note.title}</div>
-                <div class="note-item-date">Last modified: ${formatDateTime(note.meeting_date_time)}</div>
+                <div class="note-item-date">
+                    <div>Modified: ${formatDateTime(note.modified_date)}</div>
+                    <div>Created: ${formatDateTime(note.created_date)}</div>
+                </div>
             `;
             notesListContainer.appendChild(noteEl);
         });

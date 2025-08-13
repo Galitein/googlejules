@@ -12,6 +12,7 @@ export interface Task {
   created_date: string;
   finished_date: string | null;
   tags: string[];
+  priority: number;
 }
 
 export interface Folder {
@@ -90,7 +91,7 @@ ipcMain.handle('get-tasks', async (_, options: { searchQuery: string, filterTag:
   const [countRows] = await pool.query<RowDataPacket[]>(countSql, params);
   const total = countRows[0].total;
 
-  const dataSql = `SELECT * FROM tasks ${whereSql} ORDER BY status ASC, created_date DESC LIMIT ? OFFSET ?`;
+  const dataSql = `SELECT * FROM tasks ${whereSql} ORDER BY priority DESC LIMIT ? OFFSET ?`;
   const [tasks] = await pool.query<RowDataPacket[]>(dataSql, [...params, limit, offset]);
 
   return {
@@ -103,9 +104,16 @@ ipcMain.handle('get-tasks', async (_, options: { searchQuery: string, filterTag:
 
 // Get all unique tags
 ipcMain.handle('get-tags', async () => {
-  const [rows] = await pool.query<RowDataPacket[]>("SELECT tags FROM tasks WHERE tags IS NOT NULL AND JSON_LENGTH(tags) > 0");
-  const allTags = rows.flatMap(row => row.tags);
-  return [...new Set(allTags)].sort();
+  const query = `
+    SELECT DISTINCT tag
+    FROM tasks, JSON_TABLE(
+        tags,
+        '$[*]' COLUMNS (tag VARCHAR(255) PATH '$')
+    ) AS jt
+    ORDER BY tag ASC;
+  `;
+  const [rows] = await pool.query<RowDataPacket[]>(query);
+  return rows.map(row => row.tag);
 });
 
 // Create a new task
@@ -116,10 +124,11 @@ ipcMain.handle('create-task', async (_, taskData: { title: string; tags: string[
     tags: JSON.stringify(tags),
     created_date: new Date(),
     status: 'pending',
+    priority: Date.now(), // New tasks get the highest priority
   };
   const [result] = await pool.query<any>(
-    'INSERT INTO tasks (title, tags, created_date, status) VALUES (?, ?, ?, ?)',
-    [newTask.title, newTask.tags, newTask.created_date, newTask.status]
+    'INSERT INTO tasks (title, tags, created_date, status, priority) VALUES (?, ?, ?, ?, ?)',
+    [newTask.title, newTask.tags, newTask.created_date, newTask.status, newTask.priority]
   );
 
   const [newRow] = await pool.query<RowDataPacket[]>('SELECT * FROM tasks WHERE id = ?', [result.insertId]);
@@ -128,14 +137,31 @@ ipcMain.handle('create-task', async (_, taskData: { title: string; tags: string[
 
 // Update a task
 ipcMain.handle('update-task', async (_, taskId: number, updates: Partial<Task>) => {
-  if (updates.status) {
-    updates.finished_date = updates.status === 'completed' ? new Date().toISOString() : null;
+  // Create a clean object for the query to avoid side-effects and mutations
+  const fieldsToUpdate: { [key: string]: any } = {};
+
+  // Explicitly handle each possible field from the frontend
+  if (updates.title !== undefined) {
+    fieldsToUpdate.title = updates.title;
   }
-  if (updates.tags) {
-    updates.tags = JSON.stringify(updates.tags) as any;
+  if (updates.tags !== undefined) {
+    fieldsToUpdate.tags = JSON.stringify(updates.tags);
+  }
+  if (updates.status !== undefined) {
+    fieldsToUpdate.status = updates.status;
+    fieldsToUpdate.finished_date = updates.status === 'completed' ? new Date() : null;
+  }
+  if (updates.priority !== undefined) {
+    fieldsToUpdate.priority = updates.priority;
   }
 
-  const [result] = await pool.query('UPDATE tasks SET ? WHERE id = ?', [updates, taskId]);
+  // If for some reason we have no fields to update, we can return early.
+  if (Object.keys(fieldsToUpdate).length === 0) {
+      const [rows] = await pool.query<RowDataPacket[]>('SELECT * FROM tasks WHERE id = ?', [taskId]);
+      return rows[0] as Task;
+  }
+
+  const [result] = await pool.query('UPDATE tasks SET ? WHERE id = ?', [fieldsToUpdate, taskId]);
 
   if ((result as any).affectedRows === 0) {
     throw new Error('Task not found');
@@ -150,6 +176,36 @@ ipcMain.handle('delete-task', async (_, taskId: number) => {
   await pool.query('DELETE FROM tasks WHERE id = ?', [taskId]);
   return { success: true };
 });
+
+// New handler for updating task order
+ipcMain.handle('update-task-order', async (_, { movedTaskId, prevId, nextId }: { movedTaskId: number, prevId: number | null, nextId: number | null }) => {
+  let newPriority: number;
+
+  const [prevRows] = await pool.query<RowDataPacket[]>('SELECT priority FROM tasks WHERE id = ?', [prevId]);
+  const prevPriority = prevRows[0]?.priority;
+
+  const [nextRows] = await pool.query<RowD ataPacket[]>('SELECT priority FROM tasks WHERE id = ?', [nextId]);
+  const nextPriority = nextRows[0]?.priority;
+
+  if (prevId !== null && nextId !== null) {
+    // Moved between two tasks
+    newPriority = (prevPriority + nextPriority) / 2;
+  } else if (prevId !== null) {
+    // Moved to the end of the list (no next item)
+    newPriority = prevPriority - 1000; // Subtract a buffer from the previous item's priority
+  } else if (nextId !== null) {
+    // Moved to the beginning of the list (no previous item)
+    newPriority = nextPriority + 1000; // Add a buffer to the next item's priority
+  } else {
+    // List has only one item, or something went wrong. Don't change priority.
+    return;
+  }
+
+  await pool.query('UPDATE tasks SET priority = ? WHERE id = ?', [newPriority, movedTaskId]);
+
+  return { success: true };
+});
+
 
 // --- Meeting Notes IPC Handlers ---
 

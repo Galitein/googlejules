@@ -1,10 +1,17 @@
 import mysql from 'mysql2/promise';
 
+// Check for required environment variables
+if (!process.env.DB_HOST || !process.env.DB_USER || !process.env.DB_PASSWORD || !process.env.DB_NAME) {
+  console.error('FATAL ERROR: Database environment variables are not set.');
+  console.error('Please define DB_HOST, DB_USER, DB_PASSWORD, and DB_NAME in your environment.');
+  process.exit(1);
+}
+
 const dbConfig = {
-  host: '13.202.47.163',
-  user: 'root',
-  password: 'jp4PXuzUFo15vF30aHS6sReZuxHQHBKZ',
-  database: 'jules_playground',
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
@@ -47,10 +54,22 @@ export async function initDatabase() {
         status ENUM('pending', 'completed') NOT NULL DEFAULT 'pending',
         created_date DATETIME NOT NULL,
         finished_date DATETIME,
-        tags JSON
+        tags JSON,
+        priority DOUBLE NOT NULL DEFAULT 0
       )
     `);
     console.log('Table `tasks` is ready.');
+
+    // Add priority column if it doesn't exist, for backwards compatibility
+    try {
+      await connection.query(`ALTER TABLE tasks ADD COLUMN priority DOUBLE NOT NULL DEFAULT 0`);
+      console.log('Column `priority` added to `tasks` table.');
+    } catch (error: any) {
+      // Ignore "Duplicate column name" error (code ER_DUP_FIELDNAME)
+      if (error.code !== 'ER_DUP_FIELDNAME') {
+        throw error;
+      }
+    }
 
     connection.release();
   } catch (error) {

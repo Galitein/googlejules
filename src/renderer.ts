@@ -1,4 +1,5 @@
 /// <reference path="renderer.d.ts" />
+import Sortable from 'sortablejs';
 
 // --- STATE ---
 let currentPage = 1;
@@ -476,6 +477,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 await window.api.deleteTask(id);
                 fetchAndRenderData();
             }
+        }
+    });
+
+    // --- Initialize SortableJS for Drag-and-Drop ---
+    new Sortable(taskList, {
+        animation: 150,
+        ghostClass: 'sortable-ghost',
+        handle: '.task-details', // Optional: Makes only a specific area draggable
+        onEnd: (evt) => {
+            const movedItem = evt.item as HTMLElement;
+            const movedTaskId = Number(movedItem.dataset.taskId);
+
+            const prevItem = movedItem.previousElementSibling as HTMLElement;
+            const nextItem = movedItem.nextElementSibling as HTMLElement;
+
+            const prevId = prevItem ? Number(prevItem.dataset.taskId) : null;
+            const nextId = nextItem ? Number(nextItem.dataset.taskId) : null;
+
+            window.api.updateTaskOrder({ movedTaskId, prevId, nextId });
         }
     });
 

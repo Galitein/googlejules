@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, IpcMainInvokeEvent } from 'electron';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import { pool, initDatabase } from './database';
@@ -67,7 +67,7 @@ app.on('window-all-closed', () => {
 // --- IPC Handlers ---
 
 // Get Tasks with filtering, sorting, and pagination
-ipcMain.handle('get-tasks', async (_, options: { searchQuery: string, filterTag: string, page: number }) => {
+ipcMain.handle('get-tasks', async (_: IpcMainInvokeEvent, options: { searchQuery: string, filterTag: string, page: number }) => {
   const { searchQuery, filterTag, page = 1 } = options;
   const limit = 50;
   const offset = (page - 1) * limit;
@@ -103,7 +103,7 @@ ipcMain.handle('get-tasks', async (_, options: { searchQuery: string, filterTag:
 });
 
 // Get all unique tags
-ipcMain.handle('get-tags', async () => {
+ipcMain.handle('get-tags', async (_: IpcMainInvokeEvent) => {
   const query = `
     SELECT DISTINCT tag
     FROM tasks, JSON_TABLE(
@@ -117,7 +117,7 @@ ipcMain.handle('get-tags', async () => {
 });
 
 // Create a new task
-ipcMain.handle('create-task', async (_, taskData: { title: string; tags: string[] }) => {
+ipcMain.handle('create-task', async (_: IpcMainInvokeEvent, taskData: { title: string; tags: string[] }) => {
   const { title, tags } = taskData;
   const newTask = {
     title,
@@ -136,7 +136,7 @@ ipcMain.handle('create-task', async (_, taskData: { title: string; tags: string[
 });
 
 // Update a task
-ipcMain.handle('update-task', async (_, taskId: number, updates: Partial<Task>) => {
+ipcMain.handle('update-task', async (_: IpcMainInvokeEvent, taskId: number, updates: Partial<Task>) => {
   // Create a clean object for the query to avoid side-effects and mutations
   const fieldsToUpdate: { [key: string]: any } = {};
 
@@ -172,13 +172,13 @@ ipcMain.handle('update-task', async (_, taskId: number, updates: Partial<Task>) 
 });
 
 // Delete a task
-ipcMain.handle('delete-task', async (_, taskId: number) => {
+ipcMain.handle('delete-task', async (_: IpcMainInvokeEvent, taskId: number) => {
   await pool.query('DELETE FROM tasks WHERE id = ?', [taskId]);
   return { success: true };
 });
 
 // New handler for updating task order
-ipcMain.handle('update-task-order', async (_, { movedTaskId, prevId, nextId }: { movedTaskId: number, prevId: number | null, nextId: number | null }) => {
+ipcMain.handle('update-task-order', async (_: IpcMainInvokeEvent, { movedTaskId, prevId, nextId }: { movedTaskId: number, prevId: number | null, nextId: number | null }) => {
   let newPriority: number;
 
   const [prevRows] = await pool.query<RowDataPacket[]>('SELECT priority FROM tasks WHERE id = ?', [prevId]);
@@ -209,7 +209,7 @@ ipcMain.handle('update-task-order', async (_, { movedTaskId, prevId, nextId }: {
 
 // --- Meeting Notes IPC Handlers ---
 
-ipcMain.handle('get-all-meetings-data', async () => {
+ipcMain.handle('get-all-meetings-data', async (_: IpcMainInvokeEvent) => {
   const [folders] = await pool.query('SELECT * FROM folders');
   const [notes] = await pool.query('SELECT * FROM meeting_notes');
   return {
@@ -218,7 +218,7 @@ ipcMain.handle('get-all-meetings-data', async () => {
   };
 });
 
-ipcMain.handle('create-folder', async (_, { name, parentId }: { name: string, parentId: string | null }) => {
+ipcMain.handle('create-folder', async (_: IpcMainInvokeEvent, { name, parentId }: { name: string, parentId: string | null }) => {
   const newFolder: Folder = {
     id: crypto.randomUUID(),
     name,
@@ -228,13 +228,13 @@ ipcMain.handle('create-folder', async (_, { name, parentId }: { name: string, pa
   return newFolder;
 });
 
-ipcMain.handle('update-folder', async (_, { folderId, name }: { folderId: string, name: string }) => {
+ipcMain.handle('update-folder', async (_: IpcMainInvokeEvent, { folderId, name }: { folderId: string, name: string }) => {
   await pool.query('UPDATE folders SET name = ? WHERE id = ?', [name, folderId]);
   const [updatedRows] = await pool.query<RowDataPacket[]>('SELECT * FROM folders WHERE id = ?', [folderId]);
   return updatedRows[0] as Folder;
 });
 
-ipcMain.handle('create-note', async (_, { title, content, folderId }: { title: string, content: string, folderId: string }) => {
+ipcMain.handle('create-note', async (_: IpcMainInvokeEvent, { title, content, folderId }: { title: string, content: string, folderId: string }) => {
   const now = new Date();
   const newNote: MeetingNote = {
     id: crypto.randomUUID(),
@@ -256,7 +256,7 @@ ipcMain.handle('create-note', async (_, { title, content, folderId }: { title: s
   return newNote;
 });
 
-ipcMain.handle('update-note', async (_, noteId: string, updates: Partial<Omit<MeetingNote, 'id'>>) => {
+ipcMain.handle('update-note', async (_: IpcMainInvokeEvent, noteId: string, updates: Partial<Omit<MeetingNote, 'id'>>) => {
   const modified_date = new Date();
   const finalUpdates = { ...updates, modified_date };
 
@@ -266,12 +266,12 @@ ipcMain.handle('update-note', async (_, noteId: string, updates: Partial<Omit<Me
   return updatedRows[0] as MeetingNote;
 });
 
-ipcMain.handle('delete-note', async (_, noteId: string) => {
+ipcMain.handle('delete-note', async (_: IpcMainInvokeEvent, noteId: string) => {
   await pool.query('DELETE FROM meeting_notes WHERE id = ?', [noteId]);
   return { success: true };
 });
 
-ipcMain.handle('delete-folder', async (_, folderId: string) => {
+ipcMain.handle('delete-folder', async (_: IpcMainInvokeEvent, folderId: string) => {
   // The ON DELETE CASCADE in the database schema will handle deleting child folders and notes.
   await pool.query('DELETE FROM folders WHERE id = ?', [folderId]);
   return { success: true };

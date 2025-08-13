@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "A simple task management desktop application built with Electron and TypeScript.",
   "main": "dist/main.js",
+  "type": "module",
   "scripts": {
     "start": "npm run build && electron .",
     "build": "tsc",

@@ -11,6 +11,7 @@ declare global {
     created_date: string;
     finished_date: string | null;
     tags: string[];
+    priority: number;
   }
 
   interface Folder {
@@ -50,6 +51,11 @@ declare global {
         updates: Partial<Omit<Task, 'id'>>
       ) => Promise<Task>;
       deleteTask: (taskId: number) => Promise<{ success: true }>;
+      updateTaskOrder: (data: {
+        movedTaskId: number;
+        prevId: number | null;
+        nextId: number | null;
+      }) => Promise<{ success: true }>;
 
       // Meeting Notes
       getAllMeetingsData: () => Promise<{ folders: Folder[], notes: MeetingNote[] }>;

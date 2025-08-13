@@ -21,6 +21,9 @@ contextBridge.exposeInMainWorld('api', {
 
   deleteTask: (taskId: number) => ipcRenderer.invoke('delete-task', taskId),
 
+  updateTaskOrder: (data: { movedTaskId: number, prevId: number | null, nextId: number | null }) =>
+    ipcRenderer.invoke('update-task-order', data),
+
   // Meeting Notes
   getAllMeetingsData: () => ipcRenderer.invoke('get-all-meetings-data'),
   createFolder: (folderData: { name: string; parentId: string | null }) =>

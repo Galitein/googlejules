@@ -180,7 +180,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- DATA FETCHING ---
 
-    const fetchAndRenderData = async () => {
+    const fetchAndRenderTasks = async () => {
         try {
             const { tasks, total, page, limit } = await window.api.getTasks({ searchQuery, filterTag, page: currentPage });
             const allTags = await window.api.getTags();
@@ -190,7 +190,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderPagination(total, page, limit);
             updateActiveTagButton();
         } catch (error) {
-            console.error('Failed to fetch data:', error);
+            console.error('Failed to fetch task data:', error);
         }
     };
 
@@ -345,12 +345,16 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const fetchAndRenderMeetingsData = async () => {
-        meetingsData = await window.api.getAllMeetingsData();
-        if (folderTreeContainer) {
-            folderTreeContainer.innerHTML = '';
-            folderTreeContainer.appendChild(renderFolderTree(null, 0));
+        try {
+            meetingsData = await window.api.getAllMeetingsData();
+            if (folderTreeContainer) {
+                folderTreeContainer.innerHTML = '';
+                folderTreeContainer.appendChild(renderFolderTree(null, 0));
+            }
+            renderNotesList();
+        } catch (error) {
+            console.error('Failed to fetch meeting data:', error);
         }
-        renderNotesList();
     };
 
     // --- EVENT HANDLERS ---
@@ -368,7 +372,7 @@ document.addEventListener('DOMContentLoaded', () => {
         taskSearchInput.addEventListener('input', debounce(() => {
             searchQuery = taskSearchInput.value;
             currentPage = 1;
-            fetchAndRenderData();
+            fetchAndRenderTasks();
         }, 300));
     }
 
@@ -443,7 +447,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 await window.api.createTask({ title, tags });
             }
             closeModal();
-            fetchAndRenderData();
+            fetchAndRenderTasks();
         } catch (error) {
             console.error('Failed to save task:', error);
         }
@@ -459,7 +463,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (target.matches('.task-checkbox')) {
             const isChecked = (target as HTMLInputElement).checked;
             await window.api.updateTask(id, { status: isChecked ? 'completed' : 'pending' });
-            fetchAndRenderData();
+            fetchAndRenderTasks();
         }
 
         if (target.matches('.edit-btn')) {
@@ -475,7 +479,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (target.matches('.delete-btn')) {
             if (confirm('Are you sure you want to delete this task?')) {
                 await window.api.deleteTask(id);
-                fetchAndRenderData();
+                fetchAndRenderTasks();
             }
         }
     });
@@ -504,7 +508,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (target.matches('.tag-btn') && (target as HTMLButtonElement).dataset.tag) {
             filterTag = (target as HTMLButtonElement).dataset.tag!;
             currentPage = 1;
-            fetchAndRenderData();
+            fetchAndRenderTasks();
         }
     });
 
@@ -512,7 +516,7 @@ document.addEventListener('DOMContentLoaded', () => {
         allTasksBtn.addEventListener('click', () => {
             filterTag = '';
             currentPage = 1;
-            fetchAndRenderData();
+            fetchAndRenderTasks();
         });
     }
 
@@ -529,7 +533,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const target = e.target as HTMLElement;
         if (target.matches('.pagination-btn') && (target as HTMLButtonElement).dataset.page) {
             currentPage = Number((target as HTMLButtonElement).dataset.page);
-            fetchAndRenderData();
+            fetchAndRenderTasks();
         }
     });
 
@@ -546,7 +550,10 @@ document.addEventListener('DOMContentLoaded', () => {
             viewToShow.style.display = tabName === 'dashboard' ? 'flex' : 'block';
         }
 
-        if (tabName === 'meetingNotes') {
+        // Fetch data for the activated tab
+        if (tabName === 'tasks') {
+            fetchAndRenderTasks();
+        } else if (tabName === 'meetingNotes') {
             fetchAndRenderMeetingsData();
             showListView(); // Always show the list view when tab is activated
         }
@@ -721,5 +728,5 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- INITIAL LOAD ---
-    fetchAndRenderData();
+    activateTab('dashboard');
 });

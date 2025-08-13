@@ -283,11 +283,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (target.matches('.delete-btn')) { if (confirm('Are you sure you want to delete this task?')) { await window.api.deleteTask(id); fetchAndRenderTasks(); } }
     });
 
-    new window.Sortable(taskList, {
+    new (window as any).Sortable(taskList, {
         animation: 150,
         ghostClass: 'sortable-ghost',
         handle: '.task-details',
-        onEnd: (evt) => {
+        onEnd: (evt: any) => {
             const movedItem = evt.item as HTMLElement;
             const movedTaskId = Number(movedItem.dataset.taskId);
             const prevItem = movedItem.previousElementSibling as HTMLElement;

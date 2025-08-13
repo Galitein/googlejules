@@ -184,7 +184,7 @@ ipcMain.handle('update-task-order', async (_, { movedTaskId, prevId, nextId }: {
   const [prevRows] = await pool.query<RowDataPacket[]>('SELECT priority FROM tasks WHERE id = ?', [prevId]);
   const prevPriority = prevRows[0]?.priority;
 
-  const [nextRows] = await pool.query<RowD ataPacket[]>('SELECT priority FROM tasks WHERE id = ?', [nextId]);
+  const [nextRows] = await pool.query<RowDataPacket[]>('SELECT priority FROM tasks WHERE id = ?', [nextId]);
   const nextPriority = nextRows[0]?.priority;
 
   if (prevId !== null && nextId !== null) {

@@ -8,6 +8,10 @@
     "paths": {
       "CoreLogic": ["../../../CoreLogic"]
     },
+    "rootDirs": [
+      "src",
+      "../../../CoreLogic"
+    ],
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true

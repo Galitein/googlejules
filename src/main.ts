@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, IpcMainInvokeEvent } from 'electron';
 import * as path from 'path';
 import * as crypto from 'crypto';
-import { pool, initDatabase } from './database';
+import { pool, initDatabase } from './database.js';
 import { RowDataPacket } from 'mysql2';
 
 // Define the Task type
@@ -113,7 +113,7 @@ ipcMain.handle('get-tags', async (_: IpcMainInvokeEvent) => {
     ORDER BY tag ASC;
   `;
   const [rows] = await pool.query<RowDataPacket[]>(query);
-  return rows.map(row => row.tag);
+  return rows.map((row: { tag: string }) => row.tag);
 });
 
 // Create a new task

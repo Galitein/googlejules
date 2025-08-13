@@ -102,6 +102,10 @@ ipcMain.handle('get-tasks', async (_: IpcMainInvokeEvent, options: { searchQuery
   };
 });
 
+interface TagRow extends RowDataPacket {
+  tag: string;
+}
+
 // Get all unique tags
 ipcMain.handle('get-tags', async (_: IpcMainInvokeEvent) => {
   const query = `
@@ -112,8 +116,8 @@ ipcMain.handle('get-tags', async (_: IpcMainInvokeEvent) => {
     ) AS jt
     ORDER BY tag ASC;
   `;
-  const [rows] = await pool.query<RowDataPacket[]>(query);
-  return rows.map((row: { tag: string }) => row.tag);
+  const [rows] = await pool.query<TagRow[]>(query);
+  return rows.map(row => row.tag);
 });
 
 // Create a new task

@@ -19,7 +19,7 @@ app.use(express.json());
 // Initialize Database
 initDatabase().then(() => {
   console.log('Database initialized for web server.');
-}).catch(err => {
+}).catch((err: any) => {
   console.error('Failed to initialize database for web server:', err);
   process.exit(1);
 });

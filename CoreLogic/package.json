@@ -1,11 +1,16 @@
 {
   "name": "core-logic",
   "version": "1.0.0",
-  "main": "index.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
   "dependencies": {
     "mysql2": "^3.9.7"
   },
   "devDependencies": {
-    "@types/node": "^20.12.12"
+    "@types/node": "^20.12.12",
+    "typescript": "^5.3.3"
   }
 }

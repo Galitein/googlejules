@@ -7,7 +7,8 @@
     "Wrappers/Web/NodeJs"
   ],
   "scripts": {
-    "start:desktop": "npm start -w Wrappers/Desktop/ElectronJs",
-    "start:web": "npm start -w Wrappers/Web/NodeJs"
+    "build": "tsc --build --verbose",
+    "start:desktop": "npm start -w electron-task-manager",
+    "start:web": "npm start -w web-wrapper"
   }
 }

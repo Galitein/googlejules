@@ -1,0 +1,8 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./CoreLogic" },
+    { "path": "./Wrappers/Desktop/ElectronJs" },
+    { "path": "./Wrappers/Web/NodeJs" }
+  ]
+}

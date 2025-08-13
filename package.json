@@ -1,28 +1,13 @@
 {
-  "name": "electron-task-manager",
-  "version": "1.0.0",
-  "description": "A simple task management desktop application built with Electron and TypeScript.",
-  "main": "dist/main.js",
-  "scripts": {
-    "start": "npm run build && electron .",
-    "build": "tsc",
-    "watch": "tsc -w"
-  },
-  "keywords": [
-    "Electron",
-    "TypeScript",
-    "Task Manager"
+  "name": "multi-app-project",
+  "private": true,
+  "workspaces": [
+    "CoreLogic",
+    "Wrappers/Desktop/ElectronJs",
+    "Wrappers/Web/NodeJs"
   ],
-  "author": "Jules",
-  "license": "ISC",
-  "devDependencies": {
-    "@types/node": "^20.12.12",
-    "@types/sortablejs": "^1.15.8",
-    "electron": "^28.0.0",
-    "typescript": "^5.3.3"
-  },
-  "dependencies": {
-    "mysql2": "^3.9.7",
-    "sortablejs": "^1.15.2"
+  "scripts": {
+    "start:desktop": "npm start -w Wrappers/Desktop/ElectronJs",
+    "start:web": "npm start -w Wrappers/Web/NodeJs"
   }
 }

@@ -1,10 +1,8 @@
-import { app, BrowserWindow, ipcMain, IpcMainInvokeEvent } from 'electron';
-import * as path from 'path';
+import { pool } from './database';
 import * as crypto from 'crypto';
-import { pool, initDatabase } from './database';
 import { RowDataPacket } from 'mysql2';
 
-// Define the Task type
+// --- Reusable Interfaces ---
 export interface Task {
   id: number;
   title: string;
@@ -30,44 +28,14 @@ export interface MeetingNote {
   modified_date: string;
 }
 
-// --- Main Window ---
-function createWindow() {
-  const mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-    icon: path.join(__dirname, '../assets/icon.svg')
-  });
-
-  mainWindow.loadFile(path.join(__dirname, '../src/index.html'));
-  // mainWindow.webContents.openDevTools(); // Uncomment for debugging
+interface TagRow extends RowDataPacket {
+  tag: string;
 }
 
-app.whenReady().then(async () => {
-  await initDatabase();
-  createWindow();
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    }
-  });
-});
-
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
-});
-
-// --- IPC Handlers ---
+// --- Reusable Functions ---
 
 // Get Tasks with filtering, sorting, and pagination
-ipcMain.handle('get-tasks', async (_: IpcMainInvokeEvent, options: { searchQuery: string, filterTag: string, page: number }) => {
+export async function getTasks(options: { searchQuery: string, filterTag: string, page: number }) {
   const { searchQuery, filterTag, page = 1 } = options;
   const limit = 50;
   const offset = (page - 1) * limit;
@@ -100,14 +68,10 @@ ipcMain.handle('get-tasks', async (_: IpcMainInvokeEvent, options: { searchQuery
     page,
     limit,
   };
-});
-
-interface TagRow extends RowDataPacket {
-  tag: string;
 }
 
 // Get all unique tags
-ipcMain.handle('get-tags', async (_: IpcMainInvokeEvent) => {
+export async function getTags() {
   const query = `
     SELECT DISTINCT tag
     FROM tasks, JSON_TABLE(
@@ -118,10 +82,10 @@ ipcMain.handle('get-tags', async (_: IpcMainInvokeEvent) => {
   `;
   const [rows] = await pool.query<TagRow[]>(query);
   return rows.map(row => row.tag);
-});
+}
 
 // Create a new task
-ipcMain.handle('create-task', async (_: IpcMainInvokeEvent, taskData: { title: string; tags: string[] }) => {
+export async function createTask(taskData: { title: string; tags: string[] }) {
   const { title, tags } = taskData;
   const newTask = {
     title,
@@ -137,14 +101,12 @@ ipcMain.handle('create-task', async (_: IpcMainInvokeEvent, taskData: { title: s
 
   const [newRow] = await pool.query<RowDataPacket[]>('SELECT * FROM tasks WHERE id = ?', [result.insertId]);
   return newRow[0] as Task;
-});
+}
 
 // Update a task
-ipcMain.handle('update-task', async (_: IpcMainInvokeEvent, taskId: number, updates: Partial<Task>) => {
-  // Create a clean object for the query to avoid side-effects and mutations
+export async function updateTask(taskId: number, updates: Partial<Task>) {
   const fieldsToUpdate: { [key: string]: any } = {};
 
-  // Explicitly handle each possible field from the frontend
   if (updates.title !== undefined) {
     fieldsToUpdate.title = updates.title;
   }
@@ -155,11 +117,10 @@ ipcMain.handle('update-task', async (_: IpcMainInvokeEvent, taskId: number, upda
     fieldsToUpdate.status = updates.status;
     fieldsToUpdate.finished_date = updates.status === 'completed' ? new Date() : null;
   }
-  if (updates.priority !== undefined) {
+    if (updates.priority !== undefined) {
     fieldsToUpdate.priority = updates.priority;
   }
 
-  // If for some reason we have no fields to update, we can return early.
   if (Object.keys(fieldsToUpdate).length === 0) {
       const [rows] = await pool.query<RowDataPacket[]>('SELECT * FROM tasks WHERE id = ?', [taskId]);
       return rows[0] as Task;
@@ -173,16 +134,16 @@ ipcMain.handle('update-task', async (_: IpcMainInvokeEvent, taskId: number, upda
 
   const [updatedRows] = await pool.query<RowDataPacket[]>('SELECT * FROM tasks WHERE id = ?', [taskId]);
   return updatedRows[0] as Task;
-});
+}
 
 // Delete a task
-ipcMain.handle('delete-task', async (_: IpcMainInvokeEvent, taskId: number) => {
+export async function deleteTask(taskId: number) {
   await pool.query('DELETE FROM tasks WHERE id = ?', [taskId]);
   return { success: true };
-});
+}
 
 // New handler for updating task order
-ipcMain.handle('update-task-order', async (_: IpcMainInvokeEvent, { movedTaskId, prevId, nextId }: { movedTaskId: number, prevId: number | null, nextId: number | null }) => {
+export async function updateTaskOrder({ movedTaskId, prevId, nextId }: { movedTaskId: number, prevId: number | null, nextId: number | null }) {
   let newPriority: number;
 
   const [prevRows] = await pool.query<RowDataPacket[]>('SELECT priority FROM tasks WHERE id = ?', [prevId]);
@@ -192,37 +153,32 @@ ipcMain.handle('update-task-order', async (_: IpcMainInvokeEvent, { movedTaskId,
   const nextPriority = nextRows[0]?.priority;
 
   if (prevId !== null && nextId !== null) {
-    // Moved between two tasks
     newPriority = (prevPriority + nextPriority) / 2;
   } else if (prevId !== null) {
-    // Moved to the end of the list (no next item)
-    newPriority = prevPriority - 1000; // Subtract a buffer from the previous item's priority
+    newPriority = prevPriority - 1000;
   } else if (nextId !== null) {
-    // Moved to the beginning of the list (no previous item)
-    newPriority = nextPriority + 1000; // Add a buffer to the next item's priority
+    newPriority = nextPriority + 1000;
   } else {
-    // List has only one item, or something went wrong. Don't change priority.
-    return;
+    return; // Should not happen in a list with more than one item
   }
 
   await pool.query('UPDATE tasks SET priority = ? WHERE id = ?', [newPriority, movedTaskId]);
-
   return { success: true };
-});
+}
 
 
-// --- Meeting Notes IPC Handlers ---
+// --- Meeting Notes Functions ---
 
-ipcMain.handle('get-all-meetings-data', async (_: IpcMainInvokeEvent) => {
+export async function getAllMeetingsData() {
   const [folders] = await pool.query('SELECT * FROM folders');
   const [notes] = await pool.query('SELECT * FROM meeting_notes');
   return {
     folders,
     notes,
   };
-});
+}
 
-ipcMain.handle('create-folder', async (_: IpcMainInvokeEvent, { name, parentId }: { name: string, parentId: string | null }) => {
+export async function createFolder({ name, parentId }: { name: string, parentId: string | null }) {
   const newFolder: Folder = {
     id: crypto.randomUUID(),
     name,
@@ -230,15 +186,15 @@ ipcMain.handle('create-folder', async (_: IpcMainInvokeEvent, { name, parentId }
   };
   await pool.query('INSERT INTO folders SET ?', newFolder);
   return newFolder;
-});
+}
 
-ipcMain.handle('update-folder', async (_: IpcMainInvokeEvent, { folderId, name }: { folderId: string, name: string }) => {
+export async function updateFolder({ folderId, name }: { folderId: string, name: string }) {
   await pool.query('UPDATE folders SET name = ? WHERE id = ?', [name, folderId]);
   const [updatedRows] = await pool.query<RowDataPacket[]>('SELECT * FROM folders WHERE id = ?', [folderId]);
   return updatedRows[0] as Folder;
-});
+}
 
-ipcMain.handle('create-note', async (_: IpcMainInvokeEvent, { title, content, folderId }: { title: string, content: string, folderId: string }) => {
+export async function createNote({ title, content, folderId }: { title: string, content: string, folderId: string }) {
   const now = new Date();
   const newNote: MeetingNote = {
     id: crypto.randomUUID(),
@@ -249,7 +205,6 @@ ipcMain.handle('create-note', async (_: IpcMainInvokeEvent, { title, content, fo
     modified_date: now.toISOString(),
   };
 
-  // Convert date strings to Date objects for MySQL
   const dbNote = {
       ...newNote,
       created_date: now,
@@ -258,9 +213,9 @@ ipcMain.handle('create-note', async (_: IpcMainInvokeEvent, { title, content, fo
 
   await pool.query('INSERT INTO meeting_notes SET ?', dbNote);
   return newNote;
-});
+}
 
-ipcMain.handle('update-note', async (_: IpcMainInvokeEvent, noteId: string, updates: Partial<Omit<MeetingNote, 'id'>>) => {
+export async function updateNote(noteId: string, updates: Partial<Omit<MeetingNote, 'id'>>) {
   const modified_date = new Date();
   const finalUpdates = { ...updates, modified_date };
 
@@ -268,15 +223,14 @@ ipcMain.handle('update-note', async (_: IpcMainInvokeEvent, noteId: string, upda
 
   const [updatedRows] = await pool.query<RowDataPacket[]>('SELECT * FROM meeting_notes WHERE id = ?', [noteId]);
   return updatedRows[0] as MeetingNote;
-});
+}
 
-ipcMain.handle('delete-note', async (_: IpcMainInvokeEvent, noteId: string) => {
+export async function deleteNote(noteId: string) {
   await pool.query('DELETE FROM meeting_notes WHERE id = ?', [noteId]);
   return { success: true };
-});
+}
 
-ipcMain.handle('delete-folder', async (_: IpcMainInvokeEvent, folderId: string) => {
-  // The ON DELETE CASCADE in the database schema will handle deleting child folders and notes.
+export async function deleteFolder(folderId: string) {
   await pool.query('DELETE FROM folders WHERE id = ?', [folderId]);
   return { success: true };
-});
+}

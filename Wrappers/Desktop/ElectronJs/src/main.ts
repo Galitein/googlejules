@@ -18,7 +18,7 @@ import {
   Task, // We still might need the types for casting or function signatures
   Folder,
   MeetingNote
-} from 'CoreLogic';
+} from 'core-logic';
 
 // --- Main Window ---
 function createWindow() {

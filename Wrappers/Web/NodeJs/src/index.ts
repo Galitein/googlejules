@@ -7,7 +7,7 @@ import {
   updateTask,
   deleteTask,
   // ... import other functions as needed
-} from 'CoreLogic';
+} from 'core-logic';
 
 const app = express();
 const port = process.env.PORT || 3000;

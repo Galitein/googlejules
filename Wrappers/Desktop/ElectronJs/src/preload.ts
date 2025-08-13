@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { Task, Folder, MeetingNote } from 'CoreLogic';
+import type { Task, Folder, MeetingNote } from 'core-logic';
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object

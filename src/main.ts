@@ -1,6 +1,8 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import * as path from 'path';
-import * as fs from 'fs';
+import * as crypto from 'crypto';
+import { pool, initDatabase } from './database';
+import { RowDataPacket } from 'mysql2';
 
 // Define the Task type
 export interface Task {
@@ -27,61 +29,6 @@ export interface MeetingNote {
   modified_date: string;
 }
 
-// --- Data Persistence ---
-const userDataPath = app.getPath('userData');
-const tasksFilePath = path.join(userDataPath, 'tasks.json');
-const meetingsFilePath = path.join(userDataPath, 'meetings.json');
-
-interface MeetingsData {
-  folders: Folder[];
-  notes: MeetingNote[];
-}
-
-function readMeetingsData(): MeetingsData {
-  try {
-    if (!fs.existsSync(meetingsFilePath)) {
-      const defaultData = { folders: [], notes: [] };
-      fs.writeFileSync(meetingsFilePath, JSON.stringify(defaultData));
-      return defaultData;
-    }
-    const data = fs.readFileSync(meetingsFilePath, 'utf-8');
-    return JSON.parse(data);
-  } catch (error) {
-    console.error('Error reading meetings data:', error);
-    return { folders: [], notes: [] };
-  }
-}
-
-function writeMeetingsData(data: MeetingsData): void {
-  try {
-    fs.writeFileSync(meetingsFilePath, JSON.stringify(data, null, 2));
-  } catch (error) {
-    console.error('Error writing meetings data:', error);
-  }
-}
-
-function readTasks(): Task[] {
-  try {
-    if (!fs.existsSync(tasksFilePath)) {
-      fs.writeFileSync(tasksFilePath, JSON.stringify([]));
-      return [];
-    }
-    const data = fs.readFileSync(tasksFilePath, 'utf-8');
-    return JSON.parse(data);
-  } catch (error) {
-    console.error('Error reading tasks:', error);
-    return [];
-  }
-}
-
-function writeTasks(tasks: Task[]): void {
-  try {
-    fs.writeFileSync(tasksFilePath, JSON.stringify(tasks, null, 2));
-  } catch (error) {
-    console.error('Error writing tasks:', error);
-  }
-}
-
 // --- Main Window ---
 function createWindow() {
   const mainWindow = new BrowserWindow({
@@ -99,7 +46,8 @@ function createWindow() {
   // mainWindow.webContents.openDevTools(); // Uncomment for debugging
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  await initDatabase();
   createWindow();
 
   app.on('activate', () => {
@@ -118,181 +66,157 @@ app.on('window-all-closed', () => {
 // --- IPC Handlers ---
 
 // Get Tasks with filtering, sorting, and pagination
-ipcMain.handle('get-tasks', (_, options: { searchQuery: string, filterTag: string, page: number }) => {
-  let tasks = readTasks();
-
-  // 1. Filter by search query (title or tags)
-  if (options.searchQuery) {
-    const query = options.searchQuery.toLowerCase();
-    tasks = tasks.filter(task =>
-      task.title.toLowerCase().includes(query) ||
-      task.tags.some(tag => tag.toLowerCase().includes(query))
-    );
-  }
-
-  // 2. Filter by tag
-  if (options.filterTag) {
-    tasks = tasks.filter(task => task.tags.includes(options.filterTag));
-  }
-
-  // 3. Sort: pending first, then completed
-  tasks.sort((a, b) => {
-    if (a.status === b.status) return 0;
-    return a.status === 'pending' ? -1 : 1;
-  });
-
-  // 4. Paginate
-  const page = options.page || 1;
+ipcMain.handle('get-tasks', async (_, options: { searchQuery: string, filterTag: string, page: number }) => {
+  const { searchQuery, filterTag, page = 1 } = options;
   const limit = 50;
-  const startIndex = (page - 1) * limit;
-  const endIndex = page * limit;
+  const offset = (page - 1) * limit;
 
-  const paginatedTasks = tasks.slice(startIndex, endIndex);
+  let whereClauses: string[] = [];
+  let params: (string | number)[] = [];
+
+  if (searchQuery) {
+    whereClauses.push(`(title LIKE ? OR JSON_CONTAINS(tags, ?))`);
+    params.push(`%${searchQuery}%`, `"${searchQuery}"`);
+  }
+
+  if (filterTag) {
+    whereClauses.push(`JSON_CONTAINS(tags, ?)`);
+    params.push(`"${filterTag}"`);
+  }
+
+  const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
+  const countSql = `SELECT COUNT(*) as total FROM tasks ${whereSql}`;
+  const [countRows] = await pool.query<RowDataPacket[]>(countSql, params);
+  const total = countRows[0].total;
+
+  const dataSql = `SELECT * FROM tasks ${whereSql} ORDER BY status ASC, created_date DESC LIMIT ? OFFSET ?`;
+  const [tasks] = await pool.query<RowDataPacket[]>(dataSql, [...params, limit, offset]);
 
   return {
-    tasks: paginatedTasks,
-    total: tasks.length,
+    tasks: tasks as Task[],
+    total,
     page,
     limit,
   };
 });
 
 // Get all unique tags
-ipcMain.handle('get-tags', () => {
-  const tasks = readTasks();
-  const allTags = tasks.flatMap(task => task.tags);
+ipcMain.handle('get-tags', async () => {
+  const [rows] = await pool.query<RowDataPacket[]>("SELECT tags FROM tasks WHERE tags IS NOT NULL AND JSON_LENGTH(tags) > 0");
+  const allTags = rows.flatMap(row => row.tags);
   return [...new Set(allTags)].sort();
 });
 
 // Create a new task
-ipcMain.handle('create-task', (_, taskData: { title: string; tags: string[] }) => {
-  const tasks = readTasks();
-  const newTask: Task = {
-    id: Date.now(),
-    title: taskData.title,
+ipcMain.handle('create-task', async (_, taskData: { title: string; tags: string[] }) => {
+  const { title, tags } = taskData;
+  const newTask = {
+    title,
+    tags: JSON.stringify(tags),
+    created_date: new Date(),
     status: 'pending',
-    created_date: new Date().toISOString(),
-    finished_date: null,
-    tags: taskData.tags,
   };
-  const updatedTasks = [...tasks, newTask];
-  writeTasks(updatedTasks);
-  return newTask;
+  const [result] = await pool.query<any>(
+    'INSERT INTO tasks (title, tags, created_date, status) VALUES (?, ?, ?, ?)',
+    [newTask.title, newTask.tags, newTask.created_date, newTask.status]
+  );
+
+  const [newRow] = await pool.query<RowDataPacket[]>('SELECT * FROM tasks WHERE id = ?', [result.insertId]);
+  return newRow[0] as Task;
 });
 
 // Update a task
-ipcMain.handle('update-task', (_, taskId: number, updates: Partial<Task>) => {
-  let tasks = readTasks();
-  const taskIndex = tasks.findIndex(t => t.id === taskId);
+ipcMain.handle('update-task', async (_, taskId: number, updates: Partial<Task>) => {
+  if (updates.status) {
+    updates.finished_date = updates.status === 'completed' ? new Date().toISOString() : null;
+  }
+  if (updates.tags) {
+    updates.tags = JSON.stringify(updates.tags) as any;
+  }
 
-  if (taskIndex === -1) {
+  const [result] = await pool.query('UPDATE tasks SET ? WHERE id = ?', [updates, taskId]);
+
+  if ((result as any).affectedRows === 0) {
     throw new Error('Task not found');
   }
 
-  const originalTask = tasks[taskIndex];
-  const updatedTask = { ...originalTask, ...updates };
-
-  // Handle auto-updating finished_date
-  if (updates.status) {
-    updatedTask.finished_date = updates.status === 'completed' ? new Date().toISOString() : null;
-  }
-
-  tasks[taskIndex] = updatedTask;
-  writeTasks(tasks);
-  return updatedTask;
+  const [updatedRows] = await pool.query<RowDataPacket[]>('SELECT * FROM tasks WHERE id = ?', [taskId]);
+  return updatedRows[0] as Task;
 });
 
 // Delete a task
-ipcMain.handle('delete-task', (_, taskId: number) => {
-  let tasks = readTasks();
-  const updatedTasks = tasks.filter(t => t.id !== taskId);
-  writeTasks(updatedTasks);
+ipcMain.handle('delete-task', async (_, taskId: number) => {
+  await pool.query('DELETE FROM tasks WHERE id = ?', [taskId]);
   return { success: true };
 });
 
 // --- Meeting Notes IPC Handlers ---
-import * as crypto from 'crypto';
 
-ipcMain.handle('get-all-meetings-data', () => {
-  return readMeetingsData();
+ipcMain.handle('get-all-meetings-data', async () => {
+  const [folders] = await pool.query('SELECT * FROM folders');
+  const [notes] = await pool.query('SELECT * FROM meeting_notes');
+  return {
+    folders,
+    notes,
+  };
 });
 
-ipcMain.handle('create-folder', (_, { name, parentId }: { name: string, parentId: string | null }) => {
-  const data = readMeetingsData();
+ipcMain.handle('create-folder', async (_, { name, parentId }: { name: string, parentId: string | null }) => {
   const newFolder: Folder = {
     id: crypto.randomUUID(),
     name,
     parentId,
   };
-  data.folders.push(newFolder);
-  writeMeetingsData(data);
+  await pool.query('INSERT INTO folders SET ?', newFolder);
   return newFolder;
 });
 
-ipcMain.handle('update-folder', (_, { folderId, name }: { folderId: string, name: string }) => {
-  const data = readMeetingsData();
-  const folderIndex = data.folders.findIndex(f => f.id === folderId);
-  if (folderIndex === -1) throw new Error('Folder not found');
-
-  data.folders[folderIndex].name = name;
-  writeMeetingsData(data);
-  return data.folders[folderIndex];
+ipcMain.handle('update-folder', async (_, { folderId, name }: { folderId: string, name: string }) => {
+  await pool.query('UPDATE folders SET name = ? WHERE id = ?', [name, folderId]);
+  const [updatedRows] = await pool.query<RowDataPacket[]>('SELECT * FROM folders WHERE id = ?', [folderId]);
+  return updatedRows[0] as Folder;
 });
 
-ipcMain.handle('create-note', (_, { title, content, folderId }: { title: string, content: string, folderId: string }) => {
-  const data = readMeetingsData();
-  const now = new Date().toISOString();
+ipcMain.handle('create-note', async (_, { title, content, folderId }: { title: string, content: string, folderId: string }) => {
+  const now = new Date();
   const newNote: MeetingNote = {
     id: crypto.randomUUID(),
     title,
     content,
     folderId,
-    created_date: now,
-    modified_date: now,
+    created_date: now.toISOString(),
+    modified_date: now.toISOString(),
   };
-  data.notes.push(newNote);
-  writeMeetingsData(data);
+
+  // Convert date strings to Date objects for MySQL
+  const dbNote = {
+      ...newNote,
+      created_date: now,
+      modified_date: now
+  }
+
+  await pool.query('INSERT INTO meeting_notes SET ?', dbNote);
   return newNote;
 });
 
-ipcMain.handle('update-note', (_, noteId: string, updates: Partial<Omit<MeetingNote, 'id'>>) => {
-  const data = readMeetingsData();
-  const noteIndex = data.notes.findIndex(n => n.id === noteId);
-  if (noteIndex === -1) throw new Error('Note not found');
+ipcMain.handle('update-note', async (_, noteId: string, updates: Partial<Omit<MeetingNote, 'id'>>) => {
+  const modified_date = new Date();
+  const finalUpdates = { ...updates, modified_date };
 
-  const updatedNote = {
-    ...data.notes[noteIndex],
-    ...updates,
-    modified_date: new Date().toISOString(),
-  };
-  data.notes[noteIndex] = updatedNote;
-  writeMeetingsData(data);
-  return updatedNote;
+  await pool.query('UPDATE meeting_notes SET ? WHERE id = ?', [finalUpdates, noteId]);
+
+  const [updatedRows] = await pool.query<RowDataPacket[]>('SELECT * FROM meeting_notes WHERE id = ?', [noteId]);
+  return updatedRows[0] as MeetingNote;
 });
 
-ipcMain.handle('delete-note', (_, noteId: string) => {
-  const data = readMeetingsData();
-  data.notes = data.notes.filter(n => n.id !== noteId);
-  writeMeetingsData(data);
+ipcMain.handle('delete-note', async (_, noteId: string) => {
+  await pool.query('DELETE FROM meeting_notes WHERE id = ?', [noteId]);
   return { success: true };
 });
 
-ipcMain.handle('delete-folder', (_, folderId: string) => {
-  const data = readMeetingsData();
-  let foldersToDelete = [folderId];
-  let i = 0;
-  while (i < foldersToDelete.length) {
-    const currentFolderId = foldersToDelete[i];
-    const children = data.folders.filter(f => f.parentId === currentFolderId);
-    foldersToDelete.push(...children.map(c => c.id));
-    i++;
-  }
-
-  // Delete all notes in the identified folders
-  data.notes = data.notes.filter(note => !foldersToDelete.includes(note.folderId));
-  // Delete all the identified folders
-  data.folders = data.folders.filter(folder => !foldersToDelete.includes(folder.id));
-
-  writeMeetingsData(data);
+ipcMain.handle('delete-folder', async (_, folderId: string) => {
+  // The ON DELETE CASCADE in the database schema will handle deleting child folders and notes.
+  await pool.query('DELETE FROM folders WHERE id = ?', [folderId]);
   return { success: true };
 });

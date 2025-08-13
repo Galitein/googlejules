@@ -1,8 +1,13 @@
 import { app, BrowserWindow, ipcMain, IpcMainInvokeEvent } from 'electron';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import { fileURLToPath } from 'url';
 import { pool, initDatabase } from './database.js';
 import { RowDataPacket } from 'mysql2';
+
+// ES Module equivalents for __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Define the Task type
 export interface Task {

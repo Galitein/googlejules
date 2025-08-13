@@ -1,5 +1,9 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { Task, Folder, MeetingNote } from './main.js';
+import type { Task, Folder, MeetingNote } from './main';
+import Sortable from 'sortablejs';
+
+// Expose SortableJS to the renderer process
+contextBridge.exposeInMainWorld('Sortable', Sortable);
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object

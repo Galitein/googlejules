@@ -1,5 +1,4 @@
 /// <reference path="renderer.d.ts" />
-import Sortable from 'sortablejs';
 
 // --- STATE ---
 let currentPage = 1;
@@ -15,8 +14,6 @@ function getElem<T extends HTMLElement = HTMLElement>(id: string): T | null {
 
 // --- DOM EVENT LISTENER ---
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("DOMContentLoaded event fired. Initializing script.");
-
     // Tab elements
     const tabButtons = {
         dashboard: getElem('dashboard-tab-btn'),
@@ -34,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const tagsList = getElem('tags-list');
     const paginationContainer = getElem('pagination-container');
 
-    // Meeting Note Elements
+    // ... (rest of the file is the same until the Sortable initialization)
     const folderTreeContainer = getElem('folder-tree-container');
     const newFolderBtn = getElem('new-folder-btn');
     const notesListHeader = getElem('notes-list-header');
@@ -42,20 +39,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const notesListPlaceholder = getElem('notes-list-placeholder');
     const notesListContainer = getElem('notes-list-container');
     const newNoteBtn = getElem('new-note-btn');
-
-    // Note Editor Elements
     const noteEditorView = getElem('note-editor-view');
     const noteListView = getElem('note-list-view');
     const noteIdInput = getElem<HTMLInputElement>('note-id-input');
     const noteTitleInput = getElem<HTMLInputElement>('note-title-input');
-
-    // Inputs and buttons
     const taskSearchInput = getElem<HTMLInputElement>('task-search-input');
     const tagSearchInput = getElem<HTMLInputElement>('tag-search-input');
     const newTaskBtn = getElem('new-task-btn');
     const allTasksBtn = getElem('all-tasks-btn');
-
-    // Modal elements
     const modal = getElem('task-modal');
     const modalTitle = getElem('modal-title');
     const taskForm = getElem<HTMLFormElement>('task-form');
@@ -64,38 +55,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const taskTagsInput = getElem<HTMLInputElement>('task-tags-input');
     const tagInputContainer = getElem('tag-input-container');
     const cancelBtn = getElem('cancel-btn');
-
-    // Prompt Modal Elements
     const promptModal = getElem('prompt-modal');
     const promptTitle = getElem('prompt-title');
     const promptForm = getElem<HTMLFormElement>('prompt-form');
     const promptInput = getElem<HTMLInputElement>('prompt-input');
     const promptCancelBtn = getElem('prompt-cancel-btn');
 
-    // Check for critical elements
     if (!taskList || !tagsList || !paginationContainer || !modal || !taskForm) {
         console.error('Critical UI elements are missing. Application cannot start.');
         return;
     }
-    console.log("All critical UI elements found.");
 
-    // --- HELPERS ---
     const formatDateTime = (isoString: string | null) => {
         if (!isoString) return '';
         const date = new Date(isoString);
-        const day = String(date.getDate()).padStart(2, '0');
-        const month = String(date.getMonth() + 1).padStart(2, '0'); // Months are 0-based
-        const year = date.getFullYear();
-        const hours = String(date.getHours()).padStart(2, '0');
-        const minutes = String(date.getMinutes()).padStart(2, '0');
-        return `${day}-${month}-${year} ${hours}:${minutes}`;
+        return `${String(date.getDate()).padStart(2, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${date.getFullYear()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
     };
-
-    const capitalize = (s: string) => {
-        if (typeof s !== 'string' || s.length === 0) return '';
-        return s.charAt(0).toUpperCase() + s.slice(1);
-    };
-
+    const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
     const createTagBadge = (tag: string) => {
         const badge = document.createElement('span');
         badge.className = 'tag-badge';
@@ -106,8 +82,6 @@ document.addEventListener('DOMContentLoaded', () => {
         badge.appendChild(deleteBtn);
         return badge;
     };
-
-    // --- RENDER FUNCTIONS ---
     const renderTasks = (tasks: Task[]) => {
         taskList.innerHTML = '';
         if (tasks.length === 0) {
@@ -118,10 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const taskItem = document.createElement('div');
             taskItem.className = `task-item ${task.status}`;
             taskItem.dataset.taskId = String(task.id);
-            taskItem.innerHTML = `
-                <div class="task-status"><input type="checkbox" class="task-checkbox" ${task.status === 'completed' ? 'checked' : ''}></div>
-                <div class="task-details"><p class="task-title">${task.title}</p><div class="task-meta"><div class="task-tags">${task.tags.map(tag => `<span class="tag">${capitalize(tag)}</span>`).join('')}</div><div class="task-dates"><span class="date-created">Created: ${formatDateTime(task.created_date)}</span>${task.status === 'completed' ? `<span class="date-finished">Finished: ${formatDateTime(task.finished_date)}</span>` : ''}</div></div></div>
-                <div class="task-actions"><button class="btn-icon edit-btn">✏️</button><button class="btn-icon delete-btn">🗑️</button></div>`;
+            taskItem.innerHTML = `<div class="task-status"><input type="checkbox" class="task-checkbox" ${task.status === 'completed' ? 'checked' : ''}></div><div class="task-details"><p class="task-title">${task.title}</p><div class="task-meta"><div class="task-tags">${task.tags.map(tag => `<span class="tag">${capitalize(tag)}</span>`).join('')}</div><div class="task-dates"><span class="date-created">Created: ${formatDateTime(task.created_date)}</span>${task.status === 'completed' ? `<span class="date-finished">Finished: ${formatDateTime(task.finished_date)}</span>` : ''}</div></div></div><div class="task-actions"><button class="btn-icon edit-btn">✏️</button><button class="btn-icon delete-btn">🗑️</button></div>`;
             taskList.appendChild(taskItem);
         });
     };
@@ -159,34 +130,26 @@ document.addEventListener('DOMContentLoaded', () => {
             button.classList.toggle('active', !!(isAllTasks || isMatchingTag));
         });
     };
-
-    // --- DATA FETCHING ---
     const fetchAndRenderTasks = async () => {
         try {
-            console.log("Fetching and rendering tasks...");
             const { tasks, total, page, limit } = await window.api.getTasks({ searchQuery, filterTag, page: currentPage });
             const allTags = await window.api.getTags();
             renderTasks(tasks);
             renderTags(allTags);
             renderPagination(total, page, limit);
             updateActiveTagButton();
-            console.log("Task rendering complete.");
         } catch (error) { console.error('Failed to fetch task data:', error); }
     };
     const fetchAndRenderMeetingsData = async () => {
         try {
-            console.log("Fetching and rendering meetings data...");
             meetingsData = await window.api.getAllMeetingsData();
             if (folderTreeContainer) {
                 folderTreeContainer.innerHTML = '';
                 folderTreeContainer.appendChild(renderFolderTree(null, 0));
             }
             renderNotesList();
-            console.log("Meeting data rendering complete.");
         } catch (error) { console.error('Failed to fetch meeting data:', error); }
     };
-
-    // --- MODAL ---
     const openModal = (mode: 'create' | 'edit', task?: Partial<Task>) => {
         if (!modal || !modalTitle || !taskForm || !taskIdInput || !taskTitleInput || !tagInputContainer) return;
         modalTitle.textContent = mode === 'create' ? 'New Task' : 'Edit Task';
@@ -205,8 +168,6 @@ document.addEventListener('DOMContentLoaded', () => {
         modal.style.display = 'flex';
     };
     const closeModal = () => { if (modal) modal.style.display = 'none'; };
-
-    // --- Custom Prompt ---
     const showPrompt = (title: string, defaultValue = ''): Promise<string | null> => {
         return new Promise((resolve) => {
             if (!promptModal || !promptTitle || !promptForm || !promptInput || !promptCancelBtn) {
@@ -227,8 +188,6 @@ document.addEventListener('DOMContentLoaded', () => {
             promptCancelBtn.addEventListener('click', cancelListener);
         });
     };
-
-    // --- Meeting Notes Renders ---
     const renderFolderTree = (parentId: string | null, level: number): HTMLUListElement => {
         const ul = document.createElement('ul');
         if (level === 0) ul.className = 'root-level';
@@ -293,9 +252,6 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     };
 
-    // --- EVENT HANDLERS ---
-    console.log("Attaching event handlers...");
-
     if (taskSearchInput) { taskSearchInput.addEventListener('input', debounce(() => { searchQuery = taskSearchInput.value; currentPage = 1; fetchAndRenderTasks(); }, 300)); }
     if (tagSearchInput) { tagSearchInput.addEventListener('input', () => { const query = tagSearchInput.value.toLowerCase(); const tagButtons = tagsList.querySelectorAll('.tag-btn'); tagButtons.forEach(button => { const li = button.parentElement!; const tag = button.textContent?.toLowerCase() || ''; li.style.display = tag.includes(query) ? '' : 'none'; }); }); }
     if (newTaskBtn) newTaskBtn.addEventListener('click', () => openModal('create'));
@@ -327,36 +283,26 @@ document.addEventListener('DOMContentLoaded', () => {
         if (target.matches('.delete-btn')) { if (confirm('Are you sure you want to delete this task?')) { await window.api.deleteTask(id); fetchAndRenderTasks(); } }
     });
 
-    // --- Initialize SortableJS for Drag-and-Drop ---
-    try {
-        console.log("Initializing SortableJS...");
-        new Sortable(taskList, {
-            animation: 150,
-            ghostClass: 'sortable-ghost',
-            handle: '.task-details',
-            onEnd: (evt) => {
-                const movedItem = evt.item as HTMLElement;
-                const movedTaskId = Number(movedItem.dataset.taskId);
-                const prevItem = movedItem.previousElementSibling as HTMLElement;
-                const nextItem = movedItem.nextElementSibling as HTMLElement;
-                const prevId = prevItem ? Number(prevItem.dataset.taskId) : null;
-                const nextId = nextItem ? Number(nextItem.dataset.taskId) : null;
-                window.api.updateTaskOrder({ movedTaskId, prevId, nextId });
-            }
-        });
-        console.log("SortableJS initialized successfully.");
-    } catch (error) {
-        console.error("Failed to initialize SortableJS:", error);
-    }
+    new window.Sortable(taskList, {
+        animation: 150,
+        ghostClass: 'sortable-ghost',
+        handle: '.task-details',
+        onEnd: (evt) => {
+            const movedItem = evt.item as HTMLElement;
+            const movedTaskId = Number(movedItem.dataset.taskId);
+            const prevItem = movedItem.previousElementSibling as HTMLElement;
+            const nextItem = movedItem.nextElementSibling as HTMLElement;
+            const prevId = prevItem ? Number(prevItem.dataset.taskId) : null;
+            const nextId = nextItem ? Number(nextItem.dataset.taskId) : null;
+            window.api.updateTaskOrder({ movedTaskId, prevId, nextId });
+        }
+    });
 
     tagsList.addEventListener('click', (e: MouseEvent) => { const target = e.target as HTMLElement; if (target.matches('.tag-btn') && (target as HTMLButtonElement).dataset.tag) { filterTag = (target as HTMLButtonElement).dataset.tag!; currentPage = 1; fetchAndRenderTasks(); } });
     if (allTasksBtn) { allTasksBtn.addEventListener('click', () => { filterTag = ''; currentPage = 1; fetchAndRenderTasks(); }); }
     paginationContainer.addEventListener('click', (e: MouseEvent) => { const target = e.target as HTMLElement; if (target.matches('.pagination-btn') && (target as HTMLButtonElement).dataset.page) { currentPage = Number((target as HTMLButtonElement).dataset.page); fetchAndRenderTasks(); } });
 
-    // --- Tab Switching Logic ---
-    console.log("Setting up tab switching logic...");
     const activateTab = (tabName: keyof typeof views) => {
-        console.log(`Activating tab: ${tabName}`);
         Object.values(tabButtons).forEach(btn => btn?.classList.remove('active'));
         Object.values(views).forEach(view => { if (view) view.style.display = 'none'; });
         tabButtons[tabName]?.classList.add('active');
@@ -370,9 +316,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tabButton.addEventListener('click', () => activateTab(tabName as keyof typeof views));
         }
     });
-    console.log("Tab button listeners attached.");
 
-    // --- Meeting Notes Event Handlers ---
     const handleAutoSave = debounce(async () => {
         if (!noteIdInput || !noteTitleInput) return;
         const id = noteIdInput.value;
@@ -424,8 +368,5 @@ document.addEventListener('DOMContentLoaded', () => {
     if (widgetTasks) { widgetTasks.addEventListener('click', () => activateTab('tasks')); }
     if (widgetMeetingNotes) { widgetMeetingNotes.addEventListener('click', () => activateTab('meetingNotes')); }
 
-    // --- INITIAL LOAD ---
-    console.log("Performing initial load.");
     activateTab('dashboard');
-    console.log("Script initialization complete.");
 });

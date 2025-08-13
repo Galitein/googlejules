@@ -30,6 +30,7 @@ declare global {
   }
 
   interface Window {
+    Sortable: typeof import('sortablejs');
     api: {
       getTasks: (options: {
         searchQuery?: string;
